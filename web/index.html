@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoLike Manager Pro</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="logo">
+            <i class="fas fa-rocket"></i>
+            <span>GOLIKE MANAGER PRO</span>
+            <div class="logo-subtitle">Professional GoLike Automation Tool</div>
+        </div>
+        <div class="user-info">
+            <div class="user-stats">
+                <span class="stat-item">Đã cập nhật: <span id="update-count">0</span></span>
+            </div>
+            <button class="btn btn-login">
+                <i class="fas fa-user-circle"></i>
+                Đăng nhập
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-container">
+        <!-- Tab Navigation -->
+        <div class="tab-navigation">
+            <button class="tab-btn active" data-tab="accounts">
+                <i class="fas fa-users"></i>
+                <span>QUẢN LÝ TK GOLIKE</span>
+            </button>
+            <button class="tab-btn" data-tab="instagram">
+                <i class="fab fa-instagram"></i>
+                <span>QUẢN LÝ TK Instagram</span>
+            </button>
+            <button class="tab-btn" data-tab="runner">
+                <i class="fas fa-play-circle"></i>
+                <span>CHẠY GOLIKE</span>
+            </button>
+        </div>
+
+        <!-- Tab Content -->
+        <div class="tab-content">
+            <!-- GoLike Accounts Tab -->
+            <div id="accounts-tab" class="tab-pane active">
+                <div class="tab-header">
+                    <h2>DANH SÁCH TÀI KHOẢN</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" id="add-account-btn">
+                            <i class="fas fa-plus"></i>
+                            THÊM TÀI KHOẢN
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Accounts Table -->
+                <div class="table-container" id="accounts-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-col">
+                                    <input type="checkbox" id="select-all-accounts">
+                                </th>
+                                <th>STT</th>
+                                <th>id_account</th>
+                                <th>authorization</th>
+                                <th>name_account</th>
+                                <th>username_account</th>
+                                <th>email_account</th>
+                                <th>pending_coin</th>
+                                <th>total_coin</th>
+                                <th>status</th>
+                                <th>chrome</th>
+                            </tr>
+                        </thead>
+                        <tbody id="accounts-tbody">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Bottom Info Panel -->
+                <div class="bottom-panel">
+                    <div class="panel-section">
+                        <h4><i class="fas fa-info-circle"></i> THÔNG TIN</h4>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Tổng Mail:</span>
+                                <span class="info-value" id="total-mail">0</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Login Success:</span>
+                                <span class="info-value success" id="login-success">0</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Login Fail:</span>
+                                <span class="info-value error" id="login-fail">0</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- <div class="panel-section">
+                        <h4><i class="fas fa-cog"></i> CẤU HÌNH</h4>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="use-proxy"> Dùng Proxy:
+                                </label>
+                                <select id="proxy-source">
+                                    <option>Tmpproxy.com</option>
+                                </select>
+                            </div>
+                            <div class="config-item">
+                                <label>
+                                    <input type="checkbox" id="save-cookie" checked> Tự động lưu cookie sau khi đổi pass
+                                </label>
+                            </div>
+                            <div class="config-item">
+                                <label>Mật khẩu:</label>
+                                <select id="password-type">
+                                    <option>Tự nhập</option>
+                                </select>
+                            </div>
+                            <div class="config-item">
+                                <input type="text" placeholder="Nhập mật khẩu hoặc mẫu" id="password-input">
+                            </div>
+                            <div class="config-item">
+                                <label>Số luồng:</label>
+                                <input type="number" value="5" id="thread-count" min="1" max="50">
+                            </div>
+                        </div>
+                    </div> -->
+
+                    <div class="panel-section actions-section">
+                        <h4><i class="fas fa-play"></i> FILE OUTPUT</h4>
+                        <div class="action-buttons">
+                            <!-- <button class="btn btn-success" id="start-btn">
+                                <i class="fas fa-play"></i>
+                                START
+                            </button>
+                            <button class="btn btn-danger" id="stop-btn">
+                                <i class="fas fa-stop"></i>
+                                STOP
+                            </button> -->
+                            <button class="btn btn-info" id="export-btn">
+                                <i class="fas fa-download"></i>
+                                EXPORT FILE
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Instagram Accounts Tab -->
+            <div id="instagram-tab" class="tab-pane">
+                <div class="tab-header">
+                    <h2>QUẢN LÝ TÀI KHOẢN INSTAGRAM</h2>
+                    <div class="header-actions">
+                        <select id="golike-account-select" class="form-select">
+                            <option value="">Chọn tài khoản GoLike...</option>
+                        </select>
+                        <button class="btn btn-primary" id="add-instagram-btn">
+                            <i class="fab fa-instagram"></i>
+                            THÊM INSTAGRAM
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-container" id="instagram-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th class="checkbox-col">
+                                    <input type="checkbox" id="select-all-instagram">
+                                </th>
+                                <th>STT</th>
+                                <th>ID TÀI KHOẢN Instagram</th>
+                                <th>TÊN TÀI KHOẢN</th>
+                                <th>COOKIE INSTAGRAM</th>
+                                <th>TRẠNG THÁI</th>
+                                <th>NGÀY THÊM</th>
+                                <th>THAO TÁC</th>
+                            </tr>
+                        </thead>
+                        <tbody id="instagram-tbody">
+                            <!-- Data will be loaded here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="bottom-panel">
+                    <div class="panel-section">
+                        <h4><i class="fas fa-chart-bar"></i> THỐNG KÊ INSTAGRAM</h4>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Tổng IG:</span>
+                                <span class="info-value" id="total-ig">0</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Hoạt động:</span>
+                                <span class="info-value success" id="active-ig">0</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Lỗi:</span>
+                                <span class="info-value error" id="error-ig">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Runner Tab -->
+            <!-- Runner Tab -->
+            <div id="runner-tab" class="tab-pane">
+                <div class="tab-header">
+                    <h2>CHẠY GOLIKE AUTOMATION</h2>
+                    <div class="header-actions">
+                        <button class="btn btn-success" id="start-runner-btn">
+                            <i class="fas fa-rocket"></i>
+                            BẮT ĐẦU CHẠY
+                        </button>
+                        <button class="btn btn-danger" id="stop-runner-btn">
+                            <i class="fas fa-stop-circle"></i>
+                            DỪNG CHẠY
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="runner-total-accounts">0</div>
+                            <div class="stat-label">Tổng tài khoản</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-play"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="runner-running">0</div>
+                            <div class="stat-label">Đang chạy</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-coins"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="runner-nvu">0</div>
+                            <div class="stat-label">Tổng NVU</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value" id="runner-balance">0đ</div>
+                            <div class="stat-label">Tổng thu nhập</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Runner Controls -->
+                <div class="runner-controls">
+                    <div class="control-group">
+                        <label>Delay giữa các NVU (giây):</label>
+                        <input type="number" id="runner-delay" value="10" min="10" max="300" class="form-input">
+                    </div>
+                    <div class="control-group">
+                        <label>Loại nhiệm vụ:</label>
+                        <select id="task-type" class="form-select">
+                            <option value="all">Tất cả</option>
+                            <option value="like">Like</option>
+                            <option value="follow">Follow</option>
+                            <option value="share">Share</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Số luồng:</label>
+                        <input type="number" id="thread-count" value="3" min="1" max="10" class="form-input">
+                    </div>
+                    <div class="control-group">
+                        <label>Sau bnhieu nv thì đổi acc</label>
+                        <input type="number" id="switch-account-after" value="5" min="1" max="10" class="form-input">
+                    </div>
+                    <div class="control-group">
+                        <label>Sau bnhieu nv thì ngưng</label>
+                        <input type="number" id="stop-account-after" value="5" min="1" max="10" class="form-input">
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="runner-main-content">
+                    <!-- TreeView Container -->
+                    <div class="treeview-container">
+                        <div class="treeview-header">
+                            <h4>
+                                <i class="fas fa-sitemap"></i>
+                                CHỌN TÀI KHOẢN CHẠY
+                            </h4>
+                            <div class="treeview-actions">
+                                <button class="btn btn-sm btn-outline" id="expand-all-btn">
+                                    <i class="fas fa-expand"></i>
+                                    Mở rộng tất cả
+                                </button>
+                                <button class="btn btn-sm btn-outline" id="collapse-all-btn">
+                                    <i class="fas fa-compress"></i>
+                                    Thu gọn tất cả
+                                </button>
+                                <button class="btn btn-sm btn-info" id="refresh-accounts-btn">
+                                    <i class="fas fa-sync"></i>
+                                    Làm mới
+                                </button>
+                            </div>
+                        </div>
+                        <div class="treeview-content">
+                            <table class="tree-table" id="accounts-tree-table">
+                                <thead>
+                                    <tr>
+                                        <th class="checkbox-col">
+                                            <input type="checkbox" id="select-all-tree">
+                                        </th>
+                                        <th>TÀI KHOẢN</th>
+                                        <th>TRẠNG THÁI</th>
+                                        <th>PENDING COIN</th>
+                                        <th>TOTAL COIN</th>
+                                        <th>SỐ IG</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tree-tbody">
+                                    <!-- TreeView data will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Log Area -->
+                    <div class="log-container">
+                        <div class="log-header">
+                            <h4><i class="fas fa-terminal"></i> LOG HOẠT ĐỘNG</h4>
+                            <div class="log-actions">
+                                <button class="btn btn-sm btn-outline" id="clear-log-btn">
+                                    <i class="fas fa-trash"></i>
+                                    Xóa log
+                                </button>
+                                <button class="btn btn-sm btn-outline" id="export-log-btn">
+                                    <i class="fas fa-download"></i>
+                                    Export log
+                                </button>
+                            </div>
+                        </div>
+                        <div class="log-content" id="log-content">
+                            <div class="log-entry info">
+                                <span class="log-time">[00:00:00]</span>
+                                <span class="log-message">Hệ thống sẵn sàng...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Context Menus -->
+    <div id="accounts-context-menu" class="context-menu">
+        <div class="context-item" data-action="edit">
+            <i class="fas fa-edit"></i>
+            Chỉnh sửa
+        </div>
+        <div class="context-item" data-action="delete">
+            <i class="fas fa-trash"></i>
+            Xóa
+        </div>
+        <div class="context-item" data-action="copy-cookie">
+            <i class="fas fa-copy"></i>
+            Copy Cookie
+        </div>
+        <div class="context-item" data-action="refresh">
+            <i class="fas fa-sync"></i>
+            Refresh
+        </div>
+    </div>
+
+    <!-- Thay thế context menu Facebook cũ bằng context menu Instagram này -->
+    <div id="instagram-context-menu" class="context-menu">
+        <div class="context-item" data-action="edit-ig">
+            <i class="fab fa-instagram"></i>
+            Chỉnh sửa IG
+        </div>
+        
+        <div class="context-item" data-action="delete-ig">
+            <i class="fas fa-trash"></i>
+            Xóa IG
+        </div>
+        
+        <div class="context-item" data-action="check-ig">
+            <i class="fas fa-check-circle"></i>
+            Kiểm tra IG
+        </div>
+        
+        <!-- THÊM MỚI: Menu Proxy -->
+        <div class="context-divider"></div>
+        <div class="context-item" data-action="assign-proxy">
+            <i class="fas fa-network-wired"></i>
+            Quản lý Proxy
+        </div>
+    </div>
+
+    <div id="runner-context-menu" class="context-menu">
+        <div class="context-item" data-action="start-single">
+            <i class="fas fa-play"></i>
+            Chạy riêng
+        </div>
+        <div class="context-item" data-action="stop-single">
+            <i class="fas fa-stop"></i>
+            Dừng riêng
+        </div>
+        <div class="context-item" data-action="view-stats">
+            <i class="fas fa-chart-line"></i>
+            Xem thống kê
+        </div>
+    </div>
+
+    <!-- Modal quản lý Proxy -->
+    <div id="proxy-management-modal" class="modal">
+        <div class="modal-content large-modal">
+            <div class="modal-header">
+                <h3>
+                    <i class="fas fa-network-wired"></i>
+                    QUẢN LÝ PROXY CHO INSTAGRAM ACCOUNTS
+                </h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Thông tin GoLike Account -->
+                <div class="proxy-info-section">
+                    <div class="info-card">
+                        <h4><i class="fas fa-user"></i> Tài khoản GoLike</h4>
+                        <div class="info-details">
+                            <span id="proxy-golike-name">-</span>
+                            <span class="info-meta" id="proxy-golike-meta">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="info-card">
+                        <h4><i class="fab fa-instagram"></i> Instagram Accounts</h4>
+                        <div class="info-details">
+                            <span id="proxy-ig-count">0</span>
+                            <span class="info-meta">tài khoản cần gán proxy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Proxy List -->
+                <div class="form-group">
+                    <label for="proxy-list-input">
+                        <i class="fas fa-list"></i>
+                        Danh sách Proxy (Format: IP:PORT:USER:PASS hoặc IP:PORT)
+                    </label>
+                    <textarea 
+                        id="proxy-list-input" 
+                        class="form-textarea proxy-input" 
+                        placeholder="192.168.1.100:8080:username:password&#10;192.168.1.101:8080:username:password&#10;192.168.1.102:3128&#10;&#10;Mỗi proxy 1 dòng. Hỗ trợ cả proxy có auth và không có auth."
+                        rows="6"
+                    ></textarea>
+                    <div class="input-helper">
+                        <small>
+                            <i class="fas fa-info-circle"></i>
+                            Nhập danh sách proxy, mỗi proxy một dòng. Số lượng proxy phải bằng hoặc nhiều hơn số Instagram accounts.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Mapping Preview -->
+                <div class="proxy-mapping-section">
+                    <h4>
+                        <i class="fas fa-exchange-alt"></i>
+                        Xem trước ánh xạ Proxy
+                        <button class="btn btn-sm btn-outline" id="refresh-mapping-btn">
+                            <i class="fas fa-sync"></i>
+                            Làm mới
+                        </button>
+                    </h4>
+                    
+                    <div class="mapping-container">
+                        <div class="mapping-table-container">
+                            <table class="mapping-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px;">#</th>
+                                        <th>Instagram Account</th>
+                                        <th>Proxy được gán</th>
+                                        <th style="width: 80px;">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="proxy-mapping-tbody">
+                                    <!-- Mapping sẽ được generate ở đây -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Proxy Test Section -->
+                <div class="proxy-test-section">
+                    <h4>
+                        <i class="fas fa-vial"></i>
+                        Kiểm tra Proxy
+                    </h4>
+                    <div class="test-controls">
+                        <button class="btn btn-info" id="test-all-proxies-btn">
+                            <i class="fas fa-play"></i>
+                            Kiểm tra tất cả
+                        </button>
+                        <button class="btn btn-outline" id="test-selected-proxy-btn">
+                            <i class="fas fa-check"></i>
+                            Kiểm tra đã chọn
+                        </button>
+                        <div class="test-status">
+                            <span id="test-progress">Sẵn sàng kiểm tra</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <div class="footer-info">
+                    <span class="proxy-count-info">
+                        <i class="fas fa-info-circle"></i>
+                        Proxies: <span id="proxy-count">0</span> | 
+                        IG Accounts: <span id="ig-count">0</span>
+                    </span>
+                </div>
+                <div class="footer-actions">
+                    <button class="btn btn-success" id="apply-proxy-btn">
+                        <i class="fas fa-check"></i>
+                        Áp dụng Proxy
+                    </button>
+                    <button class="btn btn-danger" id="remove-all-proxy-btn">
+                        <i class="fas fa-times"></i>
+                        Xóa tất cả Proxy
+                    </button>
+                    <button class="btn btn-secondary" id="cancel-proxy-btn">
+                        <i class="fas fa-ban"></i>
+                        Hủy
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <div id="add-account-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>THÊM TÀI KHOẢN GOLIKE</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Cookie (tùy chọn):</label>
+                    <textarea id="modal-cookie" class="form-textarea" placeholder="Nhập cookie"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="save-account-btn">
+                    <i class="fas fa-save"></i>
+                    Lưu
+                </button>
+                <button class="btn btn-secondary" id="cancel-account-btn">
+                    <i class="fas fa-times"></i>
+                    Hủy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thay thế modal Facebook cũ bằng modal Instagram này -->
+    <!-- Thay modal Facebook cũ bằng: -->
+    <div id="add-instagram-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>THÊM TÀI KHOẢN INSTAGRAM</h3>
+                <button class="modal-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>Tài khoản GoLike đã chọn:</label>
+                    <input type="text" id="modal-golike-info" class="form-input" disabled>
+                </div>
+                <div class="form-group">
+                    <label>Username Instagram:</label>
+                    <input type="text" id="modal-ig-username" class="form-input" placeholder="Nhập username Instagram">
+                </div>
+                <div class="form-group">
+                    <label>Cookie Instagram:</label>
+                    <textarea id="modal-ig-cookie" class="form-textarea" placeholder="Nhập cookie Instagram..." rows="4"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" id="save-instagram-btn">
+                    <i class="fas fa-save"></i>
+                    Lưu
+                </button>
+                <button class="btn btn-secondary" id="cancel-instagram-btn">
+                    <i class="fas fa-times"></i>
+                    Hủy
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/eel.js"></script>
+    <script src="src_js/tabs.js"></script>
+    <script src="src_js/run_golike.js"></script>
+    <script src="src_js/golike-manager.js"></script> 
+    <script src="src_js/instagram-manager.js"></script>
+    <script src="src_js/proxy_manager.js"></script>
+    <!-- <script src="contextmenu.js"></script>
+    <script src="functions.js"></script> -->
+    <!-- <script src="main.js"></script> -->
+</body>
+</html>
