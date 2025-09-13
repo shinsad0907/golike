@@ -1,0 +1,516 @@
+# code by shinsad
+
+name: Build EXE
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.set-version.outputs.version }}
+      release-created: ${{ steps.set-version.outputs.release-created }}
+      uuid: ${{ steps.generate-uuid.outputs.uuid }}
+      product-id: ${{ steps.get-product-id.outputs.product-id }}
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        pip install pyinstaller
+        if (Test-Path requirements.txt) {
+          pip install -r requirements.txt
+        } else {
+          echo "No requirements.txt found, skipping..."
+        }
+      shell: powershell
+      
+    - name: Build application (folder mode)
+      run: |
+        # Kiem tra xem co file facebook.ico trong folder logo khong
+        if (Test-Path "web/logo/facebook.ico") {
+          Write-Host "[SUCCESS] Found facebook.ico in logo folder, building with icon..."
+          pyinstaller --onedir --windowed --icon="web/logo/facebook.ico" --name="Change Via Pro" app.py
+        } else {
+          Write-Host "[WARNING] facebook.ico not found in logo folder, building without icon..."
+          pyinstaller --onedir --windowed --name="Change Via Pro" app.py
+        }
+      shell: powershell
+      
+    - name: Auto-detect and copy folders to _internal
+      run: |
+        Write-Host "=== Auto-detecting folders to copy ==="
+        
+        # Danh sach cac folder se bo qua (khong copy)
+        $excludeFolders = @(
+          "dist", "build", "__pycache__", ".git", ".github", 
+          "node_modules", ".vscode", ".idea", "venv", "env",
+          ".pytest_cache", "htmlcov", ".coverage", ".mypy_cache",
+          "site-packages", ".tox", ".nox"
+        )
+        
+        # Lay tat ca folder trong root directory
+        $allFolders = Get-ChildItem -Directory | Where-Object { 
+          $_.Name -notin $excludeFolders 
+        }
+        
+        Write-Host "Folders found to copy:"
+        if ($allFolders.Count -eq 0) {
+          Write-Host "  [WARNING] No folders to copy"
+        } else {
+          $allFolders | ForEach-Object { Write-Host "  [FOLDER] $($_.Name)" }
+        }
+        
+        # Copy folders vao _internal
+        foreach ($folder in $allFolders) {
+          $sourcePath = $folder.FullName
+          $destPath = "dist/Change Via Pro/_internal/$($folder.Name)"
+          
+          Write-Host "Copying folder: $($folder.Name) -> _internal/$($folder.Name)"
+          
+          try {
+            Copy-Item -Path $sourcePath -Destination $destPath -Recurse -Force
+            Write-Host "[SUCCESS] Successfully copied folder: $($folder.Name)"
+          } catch {
+            Write-Host "[ERROR] Failed to copy folder $($folder.Name): $($_.Exception.Message)"
+          }
+        }
+        
+        Write-Host "=== Auto-copy folders completed ==="
+      shell: powershell
+      
+    - name: Copy icon file to dist folder
+      run: |
+        if (Test-Path "web/logo/facebook.ico") {
+          Copy-Item "web/logo/facebook.ico" "dist/Change Via Pro/facebook.ico"
+          Write-Host "[SUCCESS] Copied facebook.ico from logo folder to dist folder"
+        } else {
+          Write-Host "[WARNING] facebook.ico not found in logo folder, skipping copy"
+        }
+      shell: powershell
+      
+    - name: Get Product ID from config.json
+      id: get-product-id
+      run: |
+        # Tìm config.json trong thư mục data (từ _internal hoặc source)
+        $configPaths = @(
+          "dist/Change Via Pro/_internal/data/config.json",
+          "data/config.json"
+        )
+        
+        $productId = $null
+        foreach ($configPath in $configPaths) {
+          if (Test-Path $configPath) {
+            Write-Host "Found config.json at: $configPath"
+            $config = Get-Content $configPath | ConvertFrom-Json
+            $productId = $config.id
+            if ($productId) {
+              echo "product-id=$productId" >> $env:GITHUB_OUTPUT
+              Write-Host "[SUCCESS] Product ID: $productId"
+              break
+            }
+          }
+        }
+        
+        if (-not $productId) {
+          Write-Host "[ERROR] No Product ID found in data/config.json"
+          exit 1
+        }
+      shell: powershell
+      
+    - name: Generate UUID
+      id: generate-uuid
+      run: |
+        $uuid = [guid]::NewGuid().ToString()
+        echo "uuid=$uuid" >> $env:GITHUB_OUTPUT
+        echo "[SUCCESS] Generated UUID: $uuid"
+      shell: powershell
+      
+    - name: Create internal folder structure and files
+      run: |
+        # Tạo các thư mục cần thiết (nếu chưa có)
+        New-Item -ItemType Directory -Force -Path "dist/Change Via Pro/internal"
+        New-Item -ItemType Directory -Force -Path "dist/Change Via Pro/config"
+        New-Item -ItemType Directory -Force -Path "dist/Change Via Pro/data"
+        
+        # Copy README.md nếu có
+        if (Test-Path "README.md") {
+          Copy-Item "README.md" "dist/Change Via Pro/"
+        }
+        
+        # Copy update_info.json nếu có
+        if (Test-Path "update_info.json") {
+          Copy-Item "update_info.json" "dist/Change Via Pro/_internal/"
+          Write-Host "[SUCCESS] Copied update_info.json to _internal folder"
+        } else {
+          Write-Host "[WARNING] update_info.json not found in repository"
+        }
+        
+        # Tạo version.txt
+        "Change Via Pro Version: ${{ github.sha }}" | Out-File -FilePath "dist/Change Via Pro/version.txt"
+        
+        # Tạo version_client.json với UUID (không BOM)
+        $versionClientData = @{
+          version_client = "${{ steps.generate-uuid.outputs.uuid }}"
+          product_id = "${{ steps.get-product-id.outputs.product-id }}"
+          created_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+          commit_sha = "${{ github.sha }}"
+        } | ConvertTo-Json -Depth 2
+        
+        # Đảm bảo thư mục data tồn tại trong _internal
+        if (-not (Test-Path "dist/Change Via Pro/_internal/data")) {
+          New-Item -ItemType Directory -Force -Path "dist/Change Via Pro/_internal/data"
+        }
+        
+        # Ghi file version_client.json vào thư mục data trong _internal
+        $versionClientData | Out-File -FilePath "dist/Change Via Pro/_internal/data/version_client.json" -Encoding UTF8 -NoNewline
+        
+        # Copy thêm vào root data folder để backup
+        $versionClientData | Out-File -FilePath "dist/Change Via Pro/data/version_client.json" -Encoding UTF8 -NoNewline
+        
+        echo "[SUCCESS] Created version_client.json in _internal/data/ folder with UUID: ${{ steps.generate-uuid.outputs.uuid }}"
+        
+        # Kiem tra file da tao
+        if (Test-Path "dist/Change Via Pro/_internal/data/version_client.json") {
+          echo "[SUCCESS] File exists in _internal/data/ folder"
+          Get-Content "dist/Change Via Pro/_internal/data/version_client.json" | Write-Host
+        } else {
+          echo "[ERROR] File NOT created in _internal/data/ folder"
+          exit 1
+        }
+
+        # Di chuyển update_info.json ra ngoài
+        if (Test-Path "dist/Change Via Pro/_internal/update_info.json") {
+          Move-Item "dist/Change Via Pro/_internal/update_info.json" "dist/Change Via Pro/" -Force
+          Write-Host "[SUCCESS] Moved update_info.json to root folder"
+        }
+        
+        # Di chuyển folder ldplayer ra ngoài
+        if (Test-Path "dist/Change Via Pro/_internal/ldplayer") {
+          Move-Item "dist/Change Via Pro/_internal/ldplayer" "dist/Change Via Pro/" -Force
+          Write-Host "[SUCCESS] Moved ldplayer folder to root"
+        }
+        
+        # Di chuyển folder apk ra ngoài  
+        if (Test-Path "dist/Change Via Pro/_internal/apk") {
+          Move-Item "dist/Change Via Pro/_internal/apk" "dist/Change Via Pro/" -Force
+          Write-Host "[SUCCESS] Moved apk folder to root"
+        }
+        
+        # Thêm vào phần kiểm tra cấu trúc
+        echo "`nChecking moved files/folders:"
+        $itemsToCheck = @(
+          "update_info.json",
+          "ldplayer",
+          "apk"
+        )
+        
+        foreach ($item in $itemsToCheck) {
+          if (Test-Path "dist/Change Via Pro/$item") {
+            echo "[SUCCESS] Found $item in root folder"
+          } else {
+            echo "[WARNING] $item NOT found in root folder" 
+          }
+        }
+      shell: powershell
+      
+    - name: Verify folder structure
+      run: |
+        echo "=== Verifying build structure ==="
+        echo "Root Change Via Pro folder:"
+        Get-ChildItem "dist/Change Via Pro" | Select-Object Name, Mode | Format-Table
+        
+        echo "`n_internal folder contents:"
+        if (Test-Path "dist/Change Via Pro/_internal") {
+          Get-ChildItem "dist/Change Via Pro/_internal" | Select-Object Name, Length | Format-Table
+          
+          echo "`nAll copied folders in _internal:"
+          Get-ChildItem "dist/Change Via Pro/_internal" -Directory | Where-Object { 
+            $_.Name -notlike "*__pycache__*"
+          } | Select-Object FullName | Format-Table -AutoSize
+        } else {
+          echo "[ERROR] _internal folder not found!"
+        }
+        
+        echo "`nChecking version_client.json locations:"
+        if (Test-Path "dist/Change Via Pro/_internal/data/version_client.json") {
+          echo "[SUCCESS] Found in _internal/data/"
+          $content = Get-Content "dist/Change Via Pro/_internal/data/version_client.json" -Raw
+          echo "Content preview: $($content.Substring(0, [Math]::Min(100, $content.Length)))"
+        } else {
+          echo "[ERROR] NOT found in _internal/data/"
+        }
+        
+        if (Test-Path "dist/Change Via Pro/data/version_client.json") {
+          echo "[SUCCESS] Found in root/data/"
+        } else {
+          echo "[ERROR] NOT found in root/data/"
+        }
+        
+        # Kiểm tra config.json trong data
+        if (Test-Path "dist/Change Via Pro/_internal/data/config.json") {
+          echo "[SUCCESS] Found config.json in _internal/data/"
+        } else {
+          echo "[WARNING] config.json NOT found in _internal/data/"
+        }
+        
+        # Kiem tra icon file
+        if (Test-Path "dist/Change Via Pro/facebook.ico") {
+          echo "[SUCCESS] Icon file found in dist folder"
+        } else {
+          echo "[WARNING] Icon file NOT found in dist folder"
+        }
+        
+        # Kiem tra exe file
+        if (Test-Path "dist/Change Via Pro/Change Via Pro.exe") {
+          echo "[SUCCESS] Change Via Pro.exe found"
+        } else {
+          echo "[ERROR] Change Via Pro.exe NOT found"
+        }
+      shell: powershell
+      
+    - name: Create ZIP package
+      run: |
+        cd dist
+        # Tạo file ZIP với tên mới là MyApp-windows.zip
+        Compress-Archive -Path "Change Via Pro" -DestinationPath "MyApp-windows.zip"
+        
+        # Hiển thị nội dung để kiểm tra
+        Write-Host "ZIP package contents:"
+        Expand-Archive -Path "MyApp-windows.zip" -DestinationPath temp_check -Force
+        
+        Write-Host "`n=== Full structure check ==="
+        Get-ChildItem -Recurse "temp_check/Change Via Pro" | Select-Object FullName, Length | Format-Table
+        
+        Write-Host "`n=== Looking for copied folders in _internal ==="
+        Get-ChildItem -Recurse "temp_check/Change Via Pro/_internal" -Directory | Where-Object { 
+          $_.Name -notlike "*__pycache__*" -and
+          $_.Name -notlike "*dist-info*" -and
+          $_.Name -notlike "*egg-info*"
+        } | Select-Object FullName | Format-Table
+        
+        # Kiểm tra version_client.json trong data
+        if (Test-Path "temp_check/Change Via Pro/_internal/data/version_client.json") {
+          Write-Host "[SUCCESS] version_client.json found in _internal/data/"
+        } else {
+          Write-Host "[ERROR] version_client.json NOT found in _internal/data/"
+        }
+        
+        # Kiem tra icon trong ZIP
+        if (Test-Path "temp_check/Change Via Pro/facebook.ico") {
+          Write-Host "[SUCCESS] Icon file included in ZIP package"
+        } else {
+          Write-Host "[WARNING] Icon file NOT included in ZIP package"
+        }
+        
+        # Kiem tra exe file trong ZIP
+        if (Test-Path "temp_check/Change Via Pro/Change Via Pro.exe") {
+          Write-Host "[SUCCESS] Change Via Pro.exe included in ZIP package"
+        } else {
+          Write-Host "[ERROR] Change Via Pro.exe NOT included in ZIP package"
+        }
+        
+        Remove-Item -Recurse -Force temp_check
+        
+        Write-Host "ZIP file created successfully: MyApp-windows.zip"
+        Write-Host "ZIP file size: $((Get-Item MyApp-windows.zip).Length) bytes"
+      shell: powershell
+      
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: MyApp-windows
+        path: dist/MyApp-windows.zip
+        
+    - name: Set version output
+      id: set-version
+      run: |
+        if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+          VERSION=$(echo ${{ github.ref }} | sed 's/refs\/tags\///')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release-created=tag" >> $GITHUB_OUTPUT
+        else
+          echo "version=" >> $GITHUB_OUTPUT
+          echo "release-created=main" >> $GITHUB_OUTPUT
+        fi
+      shell: bash
+        
+    - name: Create Release (if tag pushed)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist/MyApp-windows.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          ## 🚀 Change Via Pro - Phiên bản mới
+          
+          ### Thay đổi
+          - Tự động build từ commit: ${{ github.sha }}
+          - Build time: ${{ github.run_number }}
+          - UUID: ${{ steps.generate-uuid.outputs.uuid }}
+          - ✨ Tự động copy tất cả folder vào _internal
+          - 🎨 EXE file có icon Facebook (từ thư mục logo)
+          - 📁 version_client.json được lưu trong thư mục data
+          
+          ### Cài đặt
+          1. Tải file ZIP
+          2. Giải nén
+          3. Chạy Change Via Pro.exe (có icon Facebook)
+          
+          ### Cấu trúc thư mục
+          ```
+          Change Via Pro/
+          ├── Change Via Pro.exe (with Facebook icon)
+          ├── facebook.ico
+          ├── version.txt
+          ├── internal/
+          ├── config/
+          ├── data/
+          │   └── version_client.json (backup)
+          └── _internal/ (PyInstaller files + Auto-copied folders)
+              ├── data/
+              │   ├── config.json
+              │   └── version_client.json ← MAIN FILE
+              ├── [your_folders] ← AUTO COPIED FOLDERS ONLY
+              └── ... (other PyInstaller files)
+          ```
+          
+          ### 📁 Auto-copied content
+          Tất cả folder từ source code đã được tự động copy vào `_internal/` 
+          để đảm bảo ứng dụng có thể truy cập được khi chạy exe.
+          
+          ### 🎨 Icon Support
+          EXE file đã được gắn icon Facebook (từ thư mục web/logo/facebook.ico)
+          
+          ### 📄 Configuration
+          - File `config.json` nằm trong thư mục `data/`
+          - File `version_client.json` được lưu trong `_internal/data/`
+      env:
+        GITHUB_TOKEN: ${{ secrets.TOOL_CHANGEVIA_PRO }}
+
+  auto-release:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && !startsWith(github.ref, 'refs/tags/')
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.TOOL_CHANGEVIA_PRO }}
+        
+    - name: Get next version
+      id: version
+      run: |
+        # Lấy tag mới nhất
+        LATEST_TAG=$(git tag -l "v*" --sort=-version:refname | head -n1)
+        
+        if [ -z "$LATEST_TAG" ]; then
+          # Nếu chưa có tag nào, bắt đầu từ v1.0.0
+          NEW_VERSION="v1.0.0"
+        else
+          echo "Latest tag: $LATEST_TAG"
+          
+          # Loại bỏ 'v' và tách các số
+          VERSION_NUMBER=$(echo $LATEST_TAG | sed 's/^v//')
+          
+          # Tách major, minor, patch
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$VERSION_NUMBER"
+          
+          # Tăng patch version
+          PATCH=$((PATCH + 1))
+          
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+        fi
+        
+        echo "New version: $NEW_VERSION"
+        echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: MyApp-windows
+        path: ./release
+        
+    - name: Create auto release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ steps.version.outputs.version }}
+        name: "Change Via Pro Auto Release ${{ steps.version.outputs.version }}"
+        files: ./release/MyApp-windows.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+        body: |
+          ## 🤖 Change Via Pro - Tự động phát hành
+          
+          Phiên bản này được tự động tạo từ commit mới nhất trên main branch.
+          
+          **Commit:** ${{ github.sha }}
+          **Thời gian:** ${{ github.event.head_commit.timestamp }}
+          **Thông điệp:** ${{ github.event.head_commit.message }}
+          **UUID:** ${{ needs.build.outputs.uuid }}
+          
+          ### 📁 Tính năng mới
+          - ✨ **Auto-copy folders**: Tự động copy tất cả folder vào `_internal/`
+          - 🔍 **Smart detection**: Bỏ qua các folder không cần thiết (.git, __pycache__, etc.)
+          - 📦 **Complete package**: Đảm bảo exe có thể truy cập tất cả resource folder
+          - 🎨 **Icon support**: EXE file có icon Facebook (từ thư mục logo)
+          - 📁 **Data organization**: version_client.json được lưu trong thư mục data
+          
+          ### Tải xuống
+          - `MyApp-windows.zip` - Phiên bản Windows với icon
+          
+          ### Nội dung package
+          - File `version_client.json` trong `_internal/data/` để kiểm tra cập nhật
+          - File `config.json` trong `_internal/data/` chứa cấu hình
+          - Thư mục `internal/` và `data/` để lưu trữ
+          - **Tất cả folder từ source** đã được copy vào `_internal/`
+          - **Icon Facebook** được gắn vào EXE file (từ thư mục logo)
+          
+          ### Cấu trúc thư mục
+          ```
+          Change Via Pro/
+          ├── Change Via Pro.exe (with Facebook icon)
+          ├── facebook.ico
+          ├── internal/
+          ├── config/
+          ├── data/
+          │   └── version_client.json (backup)
+          └── _internal/ (PyInstaller files + Your folders)
+              ├── data/
+              │   ├── config.json
+              │   └── version_client.json ← MAIN FILE
+              ├── [your_folders] ← AUTO COPIED FOLDERS ONLY
+              └── ... (PyInstaller runtime files)
+          ```
+          
+          ### 🔧 Cài đặt
+          1. Tải file ZIP
+          2. Giải nén vào thư mục bất kỳ  
+          3. Chạy `Change Via Pro.exe` (có icon Facebook)
+          
+          ### 📊 Thông tin build
+          - **Commit:** ${{ github.sha }}
+          - **Build number:** ${{ github.run_number }}
+          - **Build time:** ${{ github.event.head_commit.timestamp }}
+          - **Commit message:** ${{ github.event.head_commit.message }}
+          
+          ### 🔄 API Update Check
+          Sử dụng endpoint: `https://api.github.com/repos/${{ github.repository }}/releases/latest`
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  
