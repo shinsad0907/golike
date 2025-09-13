@@ -1,0 +1,48 @@
+[
+    {
+        "id": "1757744326132",
+        "authorization": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJodHRwOlwvXC9nYXRld2F5LmdvbGlrZS5uZXRcL2FwaVwvbG9naW4iLCJpYXQiOjE3NTc0MTQyOTMsImV4cCI6MTc4ODk1MDI5MywibmJmIjoxNzU3NDE0MjkzLCJqdGkiOiJlVDBqUTl5UndmRkxyaTBaIiwic3ViIjozMDc5MDE2LCJwcnYiOiJiOTEyNzk5NzhmMTFhYTdiYzU2NzA0ODdmZmYwMWUyMjgyNTNmZTQ4In0.fp-APrTEYr2i514R06UQCXwrjvNvCnzEtG_UnjgYFt0",
+        "instagram_accounts": [
+            {
+                "id": "76194190151",
+                "golike_account_id": 3079016,
+                "golike_username": "shinsad1",
+                "id_account_golike": 800628,
+                "instagram_username": "rabalosaben7xcv6",
+                "status": "active",
+                "created_at": "2025-09-11T08:00:59.690Z",
+                "last_check": null,
+                "cookie": ""
+            },
+            {
+                "id": "1757745232339ta7phohjm",
+                "id_account_golike": 800638,
+                "instagram_username": "mariolka1767",
+                "status": "active",
+                "created_at": "2025-09-13T06:33:52.339Z",
+                "last_check": null,
+                "cookie": "datr=7wiSaF5gTAciXPWcWtaAnnsy; ig_did=798E266F-94DA-4CC5-B33C-93620DACFB2B; mid=aJII7wALAAEfjXsTGOStRTzXQ0QX; ig_nrcb=1; ps_l=1; ps_n=1; oo=v1; csrftoken=FTFnhrpsXMxSwPrzmffMmCTpXJAsRSWp; sessionid=77132834057%3Am7NcqEqeymwwWw%3A9%3AAYgNIAPOoZiKx35_ji5zPrTgVDI6e6Xz2ccJAB6BEw; ds_user_id=77132834057; rur=\"VLL\\05477132834057\\0541789280993:01fe1637e7b181e324d8ae009049d61ec50acabc99910c3843965cbad3aa7eee541d5218\"; wd=340x831; dpr=2",
+                "golike_account_id": 3079016,
+                "golike_username": "shinsad1"
+            },
+            {
+                "id": "1757745332690zw5wdg7sn",
+                "id_account_golike": 801401,
+                "instagram_username": "marlena30112025",
+                "status": "active",
+                "created_at": "2025-09-13T06:35:32.690Z",
+                "last_check": null,
+                "cookie": "datr=7wiSaF5gTAciXPWcWtaAnnsy; ig_did=798E266F-94DA-4CC5-B33C-93620DACFB2B; mid=aJII7wALAAEfjXsTGOStRTzXQ0QX; ig_nrcb=1; ps_l=1; ps_n=1; oo=v1; csrftoken=FTFnhrpsXMxSwPrzmffMmCTpXJAsRSWp; ds_user_id=77132834057; wd=380x918; sessionid=77120612305%3ArjpRJ0i9Y9t8pP%3A17%3AAYj8TNAQZF-TVuFfwG9CSOWwd_KZzQE0kFiVCYCaXA; rur=\"VLL\\05477132834057\\0541789281289:01fe318a13b4358a9008f79c46245e91ecddaf8d0d8bbede863344fca77f206f4c940bd9\"; dpr=1",
+                "golike_account_id": 3079016,
+                "golike_username": "shinsad1"
+            }
+        ],
+        "pending_coin": 3694,
+        "total_coin": 0,
+        "id_account": 3079016,
+        "email_account": "no-email-8293914@golike.vn",
+        "name_account": "võ lê triều lân",
+        "username_account": "shinsad1",
+        "status": "ready"
+    }
+]

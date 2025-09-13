@@ -13,7 +13,6 @@ class Check_key:
         self.res = supabase_client.table("PRODUCTS").select("*").execute()
     def checK_update(self):
         for data in self.res.data:
-            print(data['id'])
             if data['id'] == 3:
                 if data['update'] == True:
                     return False
