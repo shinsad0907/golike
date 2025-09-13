@@ -397,7 +397,7 @@ jobs:
           - File `config.json` nằm trong thư mục `data/`
           - File `version_client.json` được lưu trong `_internal/data/`
       env:
-        GITHUB_TOKEN: ${{ secrets.TOOL_CHANGEVIA_PRO }}
+        GITHUB_TOKEN: ${{ secrets.Golike }}
 
   auto-release:
     runs-on: ubuntu-latest
@@ -409,7 +409,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-        token: ${{ secrets.TOOL_CHANGEVIA_PRO }}
+        token: ${{ secrets.Golike }}
         
     - name: Get next version
       id: version
