@@ -4,10 +4,11 @@ class GolikeManager:
     def __init__(self, account):
         self.account = account
         print(f"Initializing GolikeManager for account: {self.account}")
+        auth = self.account['authorization']
         self.headers = {
             'accept': 'application/json, text/plain, */*',
             'accept-language': 'vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5',
-            'authorization': f'Bearer {self.account['authorization']}',
+            'authorization': f'Bearer {auth}',
             'content-type': 'application/json;charset=utf-8',
             'origin': 'https://app.golike.net',
             'priority': 'u=1, i',
