@@ -10,3 +10,4 @@ python-dateutil==2.9.0.post0
 psutil==7.0.0
 pytesseract==0.3.13
 Eel == 0.18.1
+curl_cffi == 0.13.0
