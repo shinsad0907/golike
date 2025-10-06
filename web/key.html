@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kích hoạt bản quyền - GoLike Manager Pro</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #1a1a1a;
+        }
+
+        .key-container {
+            background: #2d2d2d;
+            border: 1px solid #404040;
+            border-radius: 10px;
+            padding: 40px 50px;
+            text-align: center;
+            width: 400px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+            animation: fadeIn 0.4s ease;
+        }
+
+        .key-container .logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .key-container .logo i {
+            color: #ffd700;
+            font-size: 28px;
+        }
+
+        .key-container .logo span {
+            color: #ffd700;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .key-container h2 {
+            color: #fff;
+            font-size: 16px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .key-container p {
+            color: #bbb;
+            font-size: 12px;
+            margin-bottom: 25px;
+        }
+
+        .key-input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 6px;
+            background: #3a3a3a;
+            border: 1px solid #555;
+            color: #fff;
+            text-align: center;
+            font-size: 13px;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+
+        .key-input:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.25);
+        }
+
+        .btn-activate {
+            background: #007bff;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            width: 100%;
+        }
+
+        .btn-activate:hover {
+            background: #0056b3;
+        }
+
+        .activation-status {
+            margin-top: 15px;
+            font-size: 12px;
+        }
+
+        .activation-status.success {
+            color: #28a745;
+        }
+
+        .activation-status.error {
+            color: #dc3545;
+        }
+
+        .footer-note {
+            font-size: 10px;
+            color: #666;
+            margin-top: 25px;
+        }
+    </style>
+</head>
+<body>
+    <div class="key-container">
+        <div class="logo">
+            <i class="fas fa-rocket"></i>
+            <span>GOLIKE MANAGER PRO</span>
+        </div>
+
+        <h2>Kích hoạt bản quyền</h2>
+        <p>Nhập key bản quyền của bạn để tiếp tục sử dụng phần mềm.</p>
+
+        <input type="text" id="license-key" class="key-input" placeholder="XXXX-XXXX-XXXX-XXXX">
+
+        <button class="btn-activate" id="activate-btn">
+            <i class="fas fa-key"></i> Kích hoạt ngay
+        </button>
+
+        <div id="activation-status" class="activation-status"></div>
+
+        <div class="footer-note">
+            <i class="fas fa-lock"></i> Thông tin key của bạn sẽ được mã hóa an toàn.
+        </div>
+    </div>
+
+    <script src="/eel.js"></script>
+    <script src="src_js/check_key.js"></script>
+</body>
+</html>
