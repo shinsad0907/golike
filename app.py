@@ -545,8 +545,8 @@ def get_runner_status():
 
 @eel.expose
 def main_check_key(key):
-    with open(r'data/version_client.json', 'r') as f:
-        version = json.loads(f)
+    with open(r'data/version_client.json', 'r', encoding="utf-8-sig") as f:
+        version = json.load(f)
     statuscheckkey = Check_key().check_update(key, version['version_client'])
     if statuscheckkey['data']:
         with open('data/key.json', "w", encoding="utf-8") as f:
@@ -563,8 +563,8 @@ if __name__ == '__main__':
     try:
         with open(r'data/key.json', "r", encoding="utf-8") as f:
             key_data = json.load(f)   # load xong là đóng file
-        with open(r'data/version_client.json', 'r') as versiondata:
-            version = json.loads(versiondata)
+        with open(r'data/version_client.json', 'r', encoding="utf-8-sig") as versiondata:
+            version = json.load(versiondata)
         status_checkkey = Check_key().check_update(key_data['key'], version)
         if status_checkkey['data'] == True:
             eel.start('index.html', size=(1200, 800), port=6060)
