@@ -1,87 +1,265 @@
 from curl_cffi import requests
-# from golike_manager import GolikeManager
+import os
+import json
+import threading
+import time
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
 
 class InstagramManager:
     def __init__(self, account):
         self.account = account
-        # print(self.account)
-        self.session = requests.Session()   
+        
+        with open(json_path, 'r', encoding='utf-8') as f:
+            self.data_manager_golike = json.load(f)
+        
         self.headers = {
-            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-            'accept-language': 'vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5',
-            'dpr': '1',
-            'priority': 'u=0, i',
-            'sec-ch-prefers-color-scheme': 'dark',
-            'sec-ch-ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
-            'sec-ch-ua-full-version-list': '"Chromium";v="140.0.7339.128", "Not=A?Brand";v="24.0.0.0", "Google Chrome";v="140.0.7339.128"',
+            'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'accept-language': 'vi-VN,vi;q=0.9,en-US;q=0.8,en;q=0.7',
+            'sec-ch-ua': '"Chromium";v="140", "Google Chrome";v="140"',
             'sec-ch-ua-mobile': '?1',
-            'sec-ch-ua-model': '"Nexus 5"',
             'sec-ch-ua-platform': '"Android"',
-            'sec-ch-ua-platform-version': '"6.0"',
-            'sec-fetch-dest': 'document',
-            'sec-fetch-mode': 'navigate',
-            'sec-fetch-site': 'none',
-            'sec-fetch-user': '?1',
-            'upgrade-insecure-requests': '1',
-            'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36',
-            'viewport-width': '340',
-            'cookie': self.account[0]["instagram_accounts"][-1]["cookie"],
+            'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36',
         }
 
         self.headers_golike = {
             'accept': 'application/json, text/plain, */*',
-            'accept-language': 'vi-VN,vi;q=0.9,fr-FR;q=0.8,fr;q=0.7,en-US;q=0.6,en;q=0.5',
-            'authorization': f'Bearer {self.account[0]["authorization"]}',
+            'authorization': f'Bearer {self.account["golike_authorization"]}',
             'content-type': 'application/json;charset=utf-8',
             'origin': 'https://app.golike.net',
-            'priority': 'u=1, i',
-            'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
-            'sec-ch-ua-mobile': '?1',
-            'sec-ch-ua-platform': '"Android"',
-            'sec-fetch-dest': 'empty',
-            'sec-fetch-mode': 'cors',
-            'sec-fetch-site': 'same-site',
             't': 'VFZSak1VNTZWWGxPVkdzeFRuYzlQUT09',
             'user-agent': 'Mozilla/5.0 (Linux; Android 13; SM-G981B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36',
         }
-    def check_user(self):
-        # try:
-        response = self.session.get('https://www.instagram.com/', headers=self.headers).text
-        print('awdawdawdad')
-        self.username = response.split('"username":"')[1].split('"')[0]
-        # except:
-        #     return False, 'Cookie không hợp lệ', None
 
-        response = self.session.get('https://gateway.golike.net/api/instagram-account',
-                                    headers=self.headers_golike,
-                                    impersonate='safari_ios').json()
-        self.id_golike = response['data']
-
-        # check local data
-        for ig_acc in self.account[0]['instagram_accounts']:
-            if ig_acc['instagram_username'] == self.username and ig_acc['cookie'] == "":
-                print('trung tài khoản')
-                return False, 'Trùng tài khoản trên hệ thống', self.username
-
-        # check golike
-        for ig_golike in self.id_golike:
-            if ig_golike['instagram_username'] == self.username:
-                self.account[0]['instagram_accounts'][-1]['golike_account_id'] = ig_golike['user_id']
-                self.account[0]['instagram_accounts'][-1]['id_account_golike'] = ig_golike['id']
-                self.account[0]['instagram_accounts'][-1]['golike_username'] = ig_golike['username']
-                return True, 'Trùng tài khoản', self.username
-        print('tài khoản không tồn tại ')
-        return False, 'Tài khoản không tồn tại trên golike', self.username
-
-
-
-    def check_account(self):
-        ok, message, username = self.check_user()
-        if ok:
-            self.account[0]['instagram_accounts'][-1]['instagram_username'] = username
+    def setup_proxy(self, proxy):
+        """Setup proxy"""
+        if not proxy or proxy.strip() == '':
+            return None
+        
+        try:
+            proxy = proxy.strip()
             
-            return True, self.account
-        else:
-            self.account[0]['instagram_accounts'].pop()
-            return False, message
+            if proxy.startswith('http://') or proxy.startswith('https://'):
+                return {'http': proxy, 'https': proxy}
+            
+            parts = proxy.split(':')
+            if len(parts) == 4:
+                ip, port, user, password = parts
+                proxy_url = f"http://{user}:{password}@{ip}:{port}"
+            elif len(parts) == 2:
+                ip, port = parts
+                proxy_url = f"http://{ip}:{port}"
+            else:
+                return None
+            
+            return {'http': proxy_url, 'https': proxy_url}
+        except:
+            return None
 
+    def follow_account(self, proxy):
+        """Follow account để verify"""
+        session = requests.Session()
+        proxies = self.setup_proxy(proxy)
+        
+        try:
+            response = session.get(self.link_verify_follow, 
+                                 headers=self.headers, 
+                                 timeout=15, 
+                                 proxies=proxies,
+                                 impersonate='chrome110')
+            text = response.text
+            
+            jazoest = text.split('jazoest=')[1].split('"')[0]
+            userID = text.split('"userID":"')[1].split('"')[0]
+            fb_dtsg = text.split('"dtsg":{"token":"')[1].split('"')[0]
+            id_follow = text.split('self.link_verify_follow')[1].split('"')[0]
+            
+            headers_copy = self.headers.copy()
+            headers_copy['x-root-field-name'] = 'xdt_api__v1__friendships__create__target_user_id'
+    
+            
+            data = {
+                'av': userID,
+                'fb_dtsg': fb_dtsg,
+                'fb_api_caller_class': 'RelayModern',
+                'fb_api_req_friendly_name': 'usePolarisFollowMutation',
+                'variables': f'{{"target_user_id":"{id_follow}","container_module":"profile"}}',
+                'doc_id': '9740159112729312',
+            }
+            
+            response = session.post('https://www.instagram.com/graphql/query', 
+                                  headers=headers_copy, 
+                                  data=data, 
+                                  timeout=15, 
+                                  proxies=proxies,
+                                  impersonate='chrome110')
+            print(response.json())
+            return response.json()
+        except:
+            return {'status': 'error'}
+
+    def add_account_golike(self, username):
+        """Thêm account vào GoLike"""
+        json_data = {'object_id': username}
+        
+        try:
+            response = requests.post('https://gateway.golike.net/api/instagram-account/verify-account', 
+                                   headers=self.headers_golike, 
+                                   json=json_data,
+                                   timeout=15,
+                                   impersonate='chrome110')
+            print(response.json())
+            return response.json()
+        except:
+            return {'status': 'error'}
+
+    def check_account_golike(self, username):
+        """Check account đã tồn tại trên GoLike chưa"""
+        try:
+            response = requests.get('https://gateway.golike.net/api/instagram-account',
+                                  headers=self.headers_golike,
+                                  timeout=15,
+                                  impersonate='chrome110').json()
+            
+            self.id_golike = response.get('data', [])
+            self.link_verify_follow = response.get('link_verify_follow', '')
+
+            for account in self.id_golike:
+                if account.get('instagram_username', '').lower() == username.lower():
+                    return True, account.get('id')
+            
+            return False, None
+        except:
+            return False, None
+
+    def update_cookie(self, username, cookie, proxy, id_golike):
+        """Cập nhật hoặc thêm mới Instagram account vào file"""
+        golike_id = self.account['golike_account_id']
+        
+        for data_manager in self.data_manager_golike:
+            if data_manager['id_account'] == golike_id:
+                if 'instagram_accounts' not in data_manager:
+                    data_manager['instagram_accounts'] = []
+                
+                # Check xem username đã tồn tại chưa
+                found = False
+                for ig_acc in data_manager['instagram_accounts']:
+                    if ig_acc['instagram_username'] == username:
+                        # Update
+                        ig_acc['cookie'] = cookie
+                        ig_acc['proxy'] = proxy
+                        ig_acc['last_check'] = datetime.now().isoformat()
+                        ig_acc['status'] = 'active'
+                        found = True
+                        break
+                
+                # Nếu chưa có thì thêm mới
+                if not found:
+                    data_manager['instagram_accounts'].append({
+                        'id': f"{int(time.time())}_{len(data_manager['instagram_accounts'])}",
+                        'id_account_golike': id_golike,
+                        'instagram_username': username,
+                        'status': 'active',
+                        'created_at': datetime.now().isoformat(),
+                        'last_check': datetime.now().isoformat(),
+                        'cookie': cookie,
+                        'proxy': proxy
+                    })
+                
+                # Lưu file
+                with open(json_path, 'w', encoding='utf-8') as f:
+                    json.dump(self.data_manager_golike, f, ensure_ascii=False, indent=4)
+                
+                return True
+        
+        return False
+
+    def check_user(self, account_data):
+        """Check 1 Instagram account"""
+        session = requests.Session()
+        
+        try:
+            cookie = account_data.get('cookie', '').strip()
+            proxy = account_data.get('proxy', '').strip()
+            
+            if not cookie:
+                return False, 'Cookie rỗng', None
+            
+            proxies = self.setup_proxy(proxy)
+            
+            headers = self.headers.copy()
+            headers['cookie'] = cookie
+            
+            response = session.get('https://www.instagram.com/', 
+                                 headers=headers, 
+                                 proxies=proxies,
+                                 timeout=15,
+                                 impersonate='chrome110')
+            
+            if response.status_code != 200:
+                return False, f'HTTP {response.status_code}', None
+            
+            text = response.text
+            
+            if '"username":"' not in text:
+                print("Cookie die or challenge required")
+                return False, 'Cookie die', None
+
+            
+            username = text.split('"username":"')[1].split('"')[0]
+            
+            # Check trên GoLike
+            exists, id_golike = self.check_account_golike(username)
+            
+            if exists:
+                # Update cookie
+                self.update_cookie(username, cookie, proxy, id_golike)
+                return True, 'Updated', username
+            else:
+                # Follow và thêm mới
+                self.follow_account(proxy)
+                time.sleep(1)
+                
+                result = self.add_account_golike(username)
+                if result.get('status') == 200:
+                    id_golike = result.get('data', {}).get('id')
+                    self.update_cookie(username, cookie, proxy, id_golike)
+                    return True, 'Added', username
+                else:
+                    return False, 'GoLike error', username
+                    
+        except Exception as e:
+            print(f"Error checking user: {e}")
+            return False, str(e), None
+
+    def thread_check_account(self, max_workers=3):
+        """Check nhiều accounts song song"""
+        accounts = self.account.get('new_instagram_accounts', [])
+        
+        if not accounts:
+            return []
+        
+        results = []
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_account = {
+                executor.submit(self.check_user, acc): acc 
+                for acc in accounts
+            }
+            
+            for future in as_completed(future_to_account):
+                try:
+                    success, message, username = future.result()
+                    results.append({
+                        'success': success,
+                        'username': username,
+                        'message': message
+                    })
+                except:
+                    results.append({'success': False})
+                
+                time.sleep(0.5)
+        
+        return results

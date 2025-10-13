@@ -335,19 +335,27 @@ def add_proxy_instagram_account(file_path, data):
         return {"success": False, "error": str(e)}
 
 @eel.expose
-def update_instagram_accounts(file_path, data):
+def update_instagram_accounts(data):
+    """
+    Thêm bulk Instagram accounts
+    """
     try:
-        print("Dữ liệu nhận được để thêm tài khoản:", data)
-        check_account, data = InstagramManager(data).check_account()
-        print(data)
-        if not check_account:
-            return {"success": False, "error": data}
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-        return {"success": True}
+        # Khởi tạo InstagramManager và check accounts
+        instagram_manager = InstagramManager(data)
+        results = instagram_manager.thread_check_account()
+        
+        # Trả về kết quả để frontend hiển thị
+        return {
+            "success": True,
+            "message": "Đã thêm Instagram accounts thành công",
+            "count": len(results)
+        }
+        
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return {
+            "success": False, 
+            "error": str(e)
+        }
 
 @eel.expose  
 def update_accounts_from_api(file_path, data):

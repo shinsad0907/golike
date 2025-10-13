@@ -1813,3 +1813,138 @@ button:focus,
 .cookie-preview:hover {
     color: #333;
 }
+.cookie-count-badge,
+.proxy-count-badge {
+    display: inline-block;
+    background: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+    margin: 0 4px;
+}
+
+.proxy-warning {
+    color: #ff9800;
+    margin-left: 10px;
+    font-weight: 600;
+}
+
+.preview-section {
+    margin-top: 20px;
+    padding: 15px;
+    background: #1a1a1a;
+    border-radius: 6px;
+    border: 1px solid #404040;
+}
+
+.preview-section h4 {
+    font-size: 12px;
+    color: #ffd700;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.preview-count {
+    font-size: 11px;
+    color: #888;
+}
+
+.preview-count strong {
+    color: #28a745;
+    font-size: 14px;
+}
+
+.preview-table-container {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #404040;
+    border-radius: 6px;
+    background: #2d2d2d;
+}
+
+.preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.preview-table th {
+    background: #3a3a3a;
+    color: #ffd700;
+    padding: 8px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 1px solid #404040;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    font-size: 10px;
+}
+
+.preview-table td {
+    padding: 8px;
+    border-bottom: 1px solid #333;
+    color: #ccc;
+    vertical-align: middle;
+}
+
+.preview-table tbody tr:hover {
+    background: #2a2a2a;
+}
+
+.preview-cookie {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #17a2b8;
+    max-width: 300px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.preview-proxy {
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    color: #28a745;
+    background: #1e3a2a;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.preview-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-weight: 600;
+}
+
+.preview-status.valid {
+    background: #1e4d3a;
+    color: #28a745;
+}
+
+.preview-status.invalid {
+    background: #4d1e1e;
+    color: #dc3545;
+}
+
+.match-info {
+    font-size: 11px;
+    color: #888;
+}
+
+#match-info.mismatch {
+    color: #ff9800;
+    font-weight: 600;
+}
+
+#save-instagram-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

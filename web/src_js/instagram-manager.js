@@ -10,27 +10,26 @@ class InstagramManager {
     }
 
     async init() {
-        console.log('Initializing Instagram Manager...');
+        console.log('🚀 Instagram Manager Starting...');
         await this.loadGolikeAccounts();
         this.setupEventListeners();
         this.updateInstagramTable();
         this.updateInstagramStats();
-        console.log('Instagram Manager initialized');
+        console.log('✅ Instagram Manager Ready');
     }
 
     async loadGolikeAccounts() {
         try {
-            console.log('Loading GoLike accounts...');
             const result = await eel.read_json_file('data/manager-golike.json')();
             if (result.success) {
                 this.golikeAccounts = result.data || [];
                 this.populateGolikeSelect();
-                console.log('GoLike accounts loaded:', this.golikeAccounts.length);
+                console.log(`✅ Loaded ${this.golikeAccounts.length} GoLike accounts`);
             } else {
-                console.error('Failed to load GoLike accounts:', result.error);
+                console.error('❌ Failed to load GoLike accounts:', result.error);
             }
         } catch (error) {
-            console.error('Error loading GoLike accounts:', error);
+            console.error('❌ Error loading GoLike accounts:', error);
         }
     }
 
@@ -91,6 +90,24 @@ class InstagramManager {
         const closeBtn = modal.querySelector('.modal-close');
         const cancelBtn = document.getElementById('cancel-instagram-btn');
         const saveBtn = document.getElementById('save-instagram-btn');
+        const previewBtn = document.getElementById('preview-instagram-btn');
+        
+        const cookieTextarea = document.getElementById('modal-ig-cookie');
+        const proxyTextarea = document.getElementById('modal-ig-proxy');
+
+        // Real-time counting
+        cookieTextarea.addEventListener('input', () => {
+            this.updateCounts();
+        });
+
+        proxyTextarea.addEventListener('input', () => {
+            this.updateCounts();
+        });
+
+        // Preview button
+        previewBtn.addEventListener('click', () => {
+            this.showPreview();
+        });
 
         // Đóng modal
         [closeBtn, cancelBtn].forEach(btn => {
@@ -106,10 +123,195 @@ class InstagramManager {
             }
         });
 
-        // Lưu Instagram account
+        // Lưu Instagram accounts (bulk)
         saveBtn.addEventListener('click', () => {
-            this.saveInstagramAccount();
+            this.saveBulkInstagramAccounts();
         });
+    }
+
+    updateCounts() {
+        const cookieText = document.getElementById('modal-ig-cookie').value.trim();
+        const proxyText = document.getElementById('modal-ig-proxy').value.trim();
+        
+        const cookies = cookieText.split('\n').filter(line => line.trim());
+        const proxies = proxyText.split('\n').filter(line => line.trim());
+        
+        const cookieCount = cookies.length;
+        const proxyCount = proxies.length;
+        
+        document.getElementById('cookie-count').textContent = cookieCount;
+        document.getElementById('proxy-count').textContent = proxyCount;
+        document.getElementById('footer-cookie-count').textContent = cookieCount;
+        document.getElementById('footer-proxy-count').textContent = proxyCount;
+        
+        const warning = document.getElementById('proxy-warning');
+        const matchInfo = document.getElementById('match-info');
+        const saveBtn = document.getElementById('save-instagram-btn');
+        
+        if (cookieCount > 0 && proxyCount > 0) {
+            if (cookieCount === proxyCount) {
+                warning.style.display = 'none';
+                matchInfo.classList.remove('mismatch');
+                saveBtn.disabled = false;
+            } else {
+                warning.style.display = 'inline';
+                matchInfo.classList.add('mismatch');
+                saveBtn.disabled = true;
+            }
+        } else {
+            warning.style.display = 'none';
+            matchInfo.classList.remove('mismatch');
+            saveBtn.disabled = true;
+        }
+    }
+
+    showPreview() {
+        const cookieText = document.getElementById('modal-ig-cookie').value.trim();
+        const proxyText = document.getElementById('modal-ig-proxy').value.trim();
+        
+        const cookies = cookieText.split('\n').filter(line => line.trim());
+        const proxies = proxyText.split('\n').filter(line => line.trim());
+        
+        if (cookies.length === 0 || cookies.length !== proxies.length) {
+            alert('Vui lòng nhập đủ cookie và proxy với số lượng bằng nhau!');
+            return;
+        }
+        
+        // Log preview gọn gàng
+        console.log('═══════════════════════════════════');
+        console.log('📋 PREVIEW INSTAGRAM ACCOUNTS');
+        console.log('═══════════════════════════════════');
+        console.log(`📌 GoLike: ${this.selectedGolikeAccount.username_account}`);
+        console.log(`📌 Authorization: ${this.selectedGolikeAccount.authorization.substring(0, 30)}...`);
+        console.log(`📌 Số lượng: ${cookies.length} accounts`);
+        console.log('───────────────────────────────────');
+        
+        const previewSection = document.getElementById('preview-section');
+        const previewTbody = document.getElementById('preview-tbody');
+        const previewCount = document.getElementById('preview-count');
+        
+        previewTbody.innerHTML = '';
+        previewCount.textContent = cookies.length;
+        
+        cookies.forEach((cookie, index) => {
+            const proxy = proxies[index];
+            const row = document.createElement('tr');
+            
+            // Log từng cặp cookie-proxy
+            console.log(`${index + 1}. Cookie: ${cookie.substring(0, 40)}... | Proxy: ${proxy}`);
+            
+            const isValidCookie = cookie.includes('sessionid') || cookie.length > 50;
+            const isValidProxy = proxy.includes(':');
+            
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>
+                    <div class="preview-cookie" title="${cookie}">
+                        ${cookie.substring(0, 60)}${cookie.length > 60 ? '...' : ''}
+                    </div>
+                </td>
+                <td>
+                    <div class="preview-proxy">${proxy}</div>
+                </td>
+                <td>
+                    <span class="preview-status ${isValidCookie && isValidProxy ? 'valid' : 'invalid'}">
+                        <i class="fas fa-${isValidCookie && isValidProxy ? 'check-circle' : 'exclamation-circle'}"></i>
+                        ${isValidCookie && isValidProxy ? 'OK' : 'Lỗi'}
+                    </span>
+                </td>
+            `;
+            
+            previewTbody.appendChild(row);
+        });
+        
+        console.log('═══════════════════════════════════\n');
+        previewSection.style.display = 'block';
+    }
+
+    // Cập nhật hàm saveBulkInstagramAccounts
+    async saveBulkInstagramAccounts() {
+        console.log('=== ADDING INSTAGRAM ACCOUNTS ===');
+        
+        const cookieText = document.getElementById('modal-ig-cookie').value.trim();
+        const proxyText = document.getElementById('modal-ig-proxy').value.trim();
+        
+        const cookies = cookieText.split('\n').filter(line => line.trim());
+        const proxies = proxyText.split('\n').filter(line => line.trim());
+        
+        if (cookies.length === 0 || cookies.length !== proxies.length) {
+            alert('Vui lòng nhập đủ cookie và proxy với số lượng bằng nhau!');
+            return;
+        }
+        
+        // Chỉ log thông tin cần thiết
+        console.log(`📌 GoLike Account: ${this.selectedGolikeAccount.username_account} (ID: ${this.selectedGolikeAccount.id_account})`);
+        console.log(`📌 Authorization: ${this.selectedGolikeAccount.authorization.substring(0, 50)}...`);
+        console.log(`📌 Số lượng IG sẽ thêm: ${cookies.length}`);
+        console.log('─────────────────────────────────');
+        
+        // Tạo danh sách Instagram accounts mới
+        const newInstagramAccounts = [];
+        cookies.forEach((cookie, index) => {
+            const newInstagram = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9) + index,
+                id_account_golike: Math.floor(Math.random() * 900000) + 100000,
+                instagram_username: `IG_${Date.now()}_${index}`,
+                status: 'active',
+                created_at: new Date().toISOString(),
+                last_check: null,
+                cookie: cookie.trim(),
+                proxy: proxies[index].trim()
+            };
+            
+            // Log từng cặp cookie-proxy
+            console.log(`✅ IG #${index + 1}:`);
+            console.log(`   Cookie: ${cookie.trim().substring(0, 60)}...`);
+            console.log(`   Proxy: ${proxies[index].trim()}`);
+            
+            newInstagramAccounts.push(newInstagram);
+        });
+        
+        console.log('─────────────────────────────────');
+        console.log(`✅ Tổng cộng đã thêm: ${newInstagramAccounts.length} accounts`);
+        
+        try {
+            // CHỈ GỬI DATA CẦN THIẾT
+            const dataToSave = {
+                golike_account_id: this.selectedGolikeAccount.id_account,
+                golike_username: this.selectedGolikeAccount.username_account,
+                golike_authorization: this.selectedGolikeAccount.authorization,
+                new_instagram_accounts: newInstagramAccounts
+            };
+            
+            console.log('📤 Sending to Python:', {
+                golike_account_id: dataToSave.golike_account_id,
+                golike_username: dataToSave.golike_username,
+                count: dataToSave.new_instagram_accounts.length
+            });
+            
+            const saveResult = await eel.update_instagram_accounts(dataToSave)();
+            
+            if (saveResult.success) {
+                // Reload lại GoLike accounts sau khi lưu thành công
+                await this.loadGolikeAccounts();
+                
+                // Tìm lại selected account
+                this.selectedGolikeAccount = this.golikeAccounts.find(
+                    acc => acc.id_account === this.selectedGolikeAccount.id_account
+                );
+                
+                this.hideAddInstagramModal();
+                this.filterInstagramByGolike();
+                this.updateInstagramStats();
+                this.showNotification(`✅ Đã thêm ${newInstagramAccounts.length} tài khoản Instagram!`, 'success');
+                console.log('✅ Lưu file thành công!');
+            } else {
+                throw new Error(saveResult.error);
+            }
+        } catch (error) {
+            console.error('❌ Lỗi khi lưu:', error);
+            this.showNotification('Lỗi khi lưu Instagram accounts!', 'error');
+        }
     }
 
     setupContextMenu() {
@@ -173,7 +375,7 @@ class InstagramManager {
         console.log('Showing add Instagram modal for:', this.selectedGolikeAccount);
         document.getElementById('modal-golike-info').value = 
             `${this.selectedGolikeAccount.username_account} (${this.selectedGolikeAccount.name_account})`;
-        document.getElementById('modal-ig-username').value = '';
+        // document.getElementById('modal-ig-username').value = '';
         document.getElementById('modal-ig-cookie').value = '';
         
         document.getElementById('add-instagram-modal').style.display = 'flex';
@@ -197,141 +399,113 @@ class InstagramManager {
         console.log('Edit mode:', this.isEditMode);
         console.log('Editing ID:', this.editingAccountId);
 
-        const username = document.getElementById('modal-ig-username').value.trim();
-        const cookie = document.getElementById('modal-ig-cookie').value.trim();
+        const cookieText = document.getElementById('modal-ig-cookie').value.trim();
+        const proxyText = document.getElementById('modal-ig-proxy').value.trim();
 
-        if (!username || !cookie) {
-            alert('Vui lòng nhập đầy đủ username và cookie!');
-            return;
-        }
-
-        // Tìm GoLike account trong mảng gốc
-        const golikeIndex = this.golikeAccounts.findIndex(acc => acc.id_account === this.selectedGolikeAccount.id_account);
-        if (golikeIndex === -1) {
-            console.error('GoLike account not found');
-            return;
-        }
-
-        // Đảm bảo có mảng IG accounts
-        if (!this.golikeAccounts[golikeIndex].instagram_accounts) {
-            this.golikeAccounts[golikeIndex].instagram_accounts = [];
-        }
+        const cookies = cookieText.split('\n').filter(line => line.trim());
+        const proxies = proxyText.split('\n').filter(line => line.trim());
 
         if (this.isEditMode && this.editingAccountId) {
-            // EDIT MODE
-            console.log('=== EDIT MODE ===');
-            const igIndex = this.golikeAccounts[golikeIndex].instagram_accounts.findIndex(ig => ig.id === this.editingAccountId);
-            if (igIndex !== -1) {
-                // Chỉ update các field cần thiết
-                this.golikeAccounts[golikeIndex].instagram_accounts[igIndex] = {
-                    ...this.golikeAccounts[golikeIndex].instagram_accounts[igIndex],
-                    instagram_username: username,
-                    cookie: cookie,
-                    updated_at: new Date().toISOString()
-                };
-                console.log('Updated existing Instagram account');
-            }
-        } else {
-            // ADD MODE
-            console.log('=== ADD MODE ===');
-            
-            // Kiểm tra duplicate username
-            const exists = this.golikeAccounts[golikeIndex].instagram_accounts.some(ig =>
-                ig.instagram_username === username
-            );
-            if (exists) {
-                alert('Instagram account này đã tồn tại!');
+            // EDIT MODE - chỉ 1 account
+            if (cookies.length !== 1 || proxies.length !== 1) {
+                alert('Chế độ sửa chỉ được 1 cookie và 1 proxy!');
                 return;
             }
 
-            // Tạo IG account mới
-            const newInstagram = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-                id_account_golike: Math.floor(Math.random() * 900000) + 100000,
-                instagram_username: username,
-                status: 'active',
-                created_at: new Date().toISOString(),
-                last_check: null,
-                cookie: cookie
+            const dataToUpdate = {
+                golike_account_id: this.selectedGolikeAccount.id_account,
+                instagram_id: this.editingAccountId,
+                cookie: cookies[0].trim(),
+                proxy: proxies[0].trim(),
+                updated_at: new Date().toISOString()
             };
 
-            this.golikeAccounts[golikeIndex].instagram_accounts.push(newInstagram);
-            console.log('Added new Instagram account');
-        }
+            console.log('📤 Update IG account:', dataToUpdate.instagram_id);
+            console.log(`   Cookie: ${dataToUpdate.cookie.substring(0, 50)}...`);
+            console.log(`   Proxy: ${dataToUpdate.proxy}`);
 
-        try {
-            // Chỉ lưu file manager-golike.json với dữ liệu đã update
-            console.log('Saving to manager-golike.json...');
-            const saveResult = await eel.update_instagram_accounts('data/manager-golike.json', this.golikeAccounts)();
-            console.log('Save result:', saveResult);
-            
-            if (saveResult.success) {
-                // Update selectedGolikeAccount để đồng bộ
-                this.selectedGolikeAccount = this.golikeAccounts[golikeIndex];
+            try {
+                const saveResult = await eel.update_instagram_accounts(dataToSave)();
                 
-                this.hideAddInstagramModal();
-                this.filterInstagramByGolike(); // Refresh view
-                this.updateInstagramStats();
-
-                const message = this.isEditMode ? 'Cập nhật Instagram account thành công!' : 'Thêm Instagram account thành công!';
-                this.showNotification(message, 'success');
-            } else {
-                throw new Error(saveResult.error);
+                if (saveResult.success) {
+                    await this.loadGolikeAccounts();
+                    this.selectedGolikeAccount = this.golikeAccounts.find(
+                        acc => acc.id_account === this.selectedGolikeAccount.id_account
+                    );
+                    
+                    this.hideAddInstagramModal();
+                    this.filterInstagramByGolike();
+                    this.updateInstagramStats();
+                    this.showNotification('✅ Cập nhật thành công!', 'success');
+                    console.log('✅ Updated successfully');
+                } else {
+                    throw new Error(saveResult.error);
+                }
+            } catch (error) {
+                console.error('❌ Update error:', error);
+                this.showNotification('Lỗi khi cập nhật!', 'error');
             }
-        } catch (error) {
-            console.error('Error saving Instagram account:', error);
-            this.showNotification('Lỗi khi lưu Instagram account!', 'error');
+        } else {
+            // ADD MODE - gọi hàm bulk add
+            this.saveBulkInstagramAccounts();
         }
     }
 
-    async editInstagramAccount(igAccount) {
-        console.log('=== EDIT INSTAGRAM ACCOUNT ===');
-        console.log('Account to edit:', igAccount);
+    editInstagramAccount(igAccount) {
+        console.log(`✏️ Edit IG: ${igAccount.instagram_username}`);
         
         this.isEditMode = true;
         this.editingAccountId = igAccount.id;
         
-        console.log('Setting edit mode - ID:', this.editingAccountId);
-        
         document.getElementById('modal-golike-info').value = 
             `${igAccount.golike_username} (ID: ${igAccount.golike_account_id})`;
-        document.getElementById('modal-ig-username').value = igAccount.instagram_username;
+        
+        // Hiển thị cookie và proxy hiện tại trong console
+        console.log(`   Current Cookie: ${(igAccount.cookie || '').substring(0, 50)}...`);
+        console.log(`   Current Proxy: ${igAccount.proxy || 'N/A'}`);
+        
+        // Fill form với cookie hiện tại (1 dòng)
         document.getElementById('modal-ig-cookie').value = igAccount.cookie || '';
+        document.getElementById('modal-ig-proxy').value = igAccount.proxy || '';
         
         document.getElementById('add-instagram-modal').style.display = 'flex';
-        console.log('Modal opened in EDIT mode for account:', igAccount.instagram_username);
     }
 
     async deleteInstagramAccount(igId) {
         if (!confirm('Bạn có chắc chắn muốn xóa Instagram account này?')) return;
 
-        console.log('Deleting Instagram account:', igId);
-
-        // Tìm và xóa trong GoLike gốc
-        const golikeIndex = this.golikeAccounts.findIndex(acc => acc.id_account === this.selectedGolikeAccount?.id_account);
-        if (golikeIndex !== -1 && this.golikeAccounts[golikeIndex].instagram_accounts) {
-            // Lọc bỏ account cần xóa
-            this.golikeAccounts[golikeIndex].instagram_accounts = 
-                this.golikeAccounts[golikeIndex].instagram_accounts.filter(ig => ig.id !== igId);
-        }
+        console.log(`🗑️ Delete IG: ${igId}`);
 
         try {
-            // Lưu lại file
-            const saveResult = await eel.delete_instagram_account('data/manager-golike.json', this.golikeAccounts)();
+            // CHỈ GỬI ID CẦN XÓA
+            const dataToDelete = {
+                golike_account_id: this.selectedGolikeAccount.id_account,
+                instagram_id: igId
+            };
+
+            console.log('📤 Deleting:', dataToDelete);
+
+            const saveResult = await eel.delete_instagram_account(
+                'data/manager-golike.json',
+                dataToDelete
+            )();
             
             if (saveResult.success) {
-                // Update selectedGolikeAccount
-                this.selectedGolikeAccount = this.golikeAccounts[golikeIndex];
+                await this.loadGolikeAccounts();
+                this.selectedGolikeAccount = this.golikeAccounts.find(
+                    acc => acc.id_account === this.selectedGolikeAccount.id_account
+                );
                 
-                this.filterInstagramByGolike(); // Refresh view
+                this.filterInstagramByGolike();
                 this.updateInstagramStats();
-                this.showNotification('Xóa Instagram account thành công!', 'success');
+                this.showNotification('✅ Xóa thành công!', 'success');
+                console.log('✅ Deleted successfully');
             } else {
                 throw new Error(saveResult.error);
             }
         } catch (error) {
-            console.error('Error deleting Instagram account:', error);
-            this.showNotification('Lỗi khi xóa Instagram account!', 'error');
+            console.error('❌ Delete error:', error);
+            this.showNotification('Lỗi khi xóa!', 'error');
         }
     }
 
@@ -378,24 +552,20 @@ class InstagramManager {
 
     filterInstagramByGolike() {
         if (!this.selectedGolikeAccount) {
-            console.log('No GoLike account selected');
             this.updateInstagramTable([]);
             return;
         }
 
-        console.log('Filtering Instagram accounts for GoLike account:', this.selectedGolikeAccount.id_account);
+        console.log(`📌 Filter IG for: ${this.selectedGolikeAccount.username_account}`);
         
-        // Lấy trực tiếp từ selectedGolikeAccount.instagram_accounts
         const instagramAccounts = this.selectedGolikeAccount.instagram_accounts || [];
-        
-        // Thêm golike info để hiển thị
         const enrichedAccounts = instagramAccounts.map(igAcc => ({
             ...igAcc,
             golike_account_id: this.selectedGolikeAccount.id_account,
             golike_username: this.selectedGolikeAccount.username_account
         }));
         
-        console.log('Filtered Instagram accounts:', enrichedAccounts.length);
+        console.log(`   Found ${enrichedAccounts.length} Instagram accounts`);
         this.updateInstagramTable(enrichedAccounts);
     }
 
