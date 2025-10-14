@@ -7,11 +7,8 @@ import sys
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# FIX: Redirect stdout/stderr nếu None (cho EXE mode)
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, 'w')
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, 'w')
+# ❌ KHÔNG redirect stdout/stderr - sẽ làm hỏng Eel!
+# Chỉ cần bảo vệ flush() method trong hàm log()
 
 json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
 
