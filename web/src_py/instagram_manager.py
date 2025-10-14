@@ -3,9 +3,15 @@ import os
 import json
 import threading
 import time
-import sys  # THÊM IMPORT SYS
+import sys
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# FIX: Redirect stdout/stderr nếu None (cho EXE mode)
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
 
 json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
 
@@ -58,10 +64,13 @@ class InstagramManager:
         }
 
     def log(self, message, flush=True):
-        """Helper function để print với flush"""
-        print(message)
-        if flush:
-            sys.stdout.flush()
+        """Helper function để print với flush - Safe cho EXE"""
+        try:
+            print(message)
+            if flush and sys.stdout is not None:
+                sys.stdout.flush()
+        except:
+            pass  # Ignore flush errors trong EXE mode
 
     def setup_proxy(self, proxy):
         """Setup proxy"""
@@ -104,11 +113,8 @@ class InstagramManager:
             text = response.text
             
             jazoest = text.split('jazoest=')[1].split('"')[0]
-            print(jazoest)
             userID = text.split('"userID":"')[1].split('"')[0]
-            print(userID)
             fb_dtsg = text.split('"dtsg":{"token":"')[1].split('"')[0]
-            print(fb_dtsg)
             id_follow = text.split('"page_id":"profilePage_')[1].split('"')[0]
             self.log(f"[FOLLOW] UserID: {userID}, ID Follow: {id_follow}")
             
