@@ -376,15 +376,20 @@ class InstagramManager {
                     ` : ''}
                 </div>
                 
-                <div class="modal-footer" style="padding: 15px; border-top: 1px solid #ddd; text-align: right;">
-                    <button class="btn btn-primary" onclick="this.closest('.modal').remove()">
-                        <i class="fas fa-check"></i> Đóng
-                    </button>
+                <div class="modal-footer" style="padding: 15px; border-top: 1px solid #ddd; text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+                    ${successful.length > 0 ? `
+                        <button class="btn btn-outline" onclick="window.instagramManager.exportAccounts(${JSON.stringify(successful).replace(/"/g, '&quot;')}, 'successful')">
+                            <i class="fas fa-download"></i> Export thành công
+                        </button>
+                    ` : ''}
                     ${failed.length > 0 ? `
-                        <button class="btn btn-outline" onclick="window.instagramManager.exportFailedAccounts(${JSON.stringify(failed).replace(/"/g, '&quot;')})">
+                        <button class="btn btn-danger" onclick="window.instagramManager.exportAccounts(${JSON.stringify(failed).replace(/"/g, '&quot;')}, 'failed')">
                             <i class="fas fa-download"></i> Export lỗi
                         </button>
                     ` : ''}
+                    <button class="btn btn-primary" onclick="this.closest('.modal').remove()">
+                        <i class="fas fa-check"></i> Đóng
+                    </button>
                 </div>
             </div>
         `;
@@ -392,27 +397,41 @@ class InstagramManager {
         document.body.appendChild(modal);
         modal.style.display = 'flex';
     }
-    exportFailedAccounts(failed) {
-        let content = '=== INSTAGRAM ACCOUNTS LỖI ===\n\n';
+    
+    // Và thêm hàm exportAccounts này vào class InstagramManager:
+    exportAccounts(accounts, type) {
+        console.log(`📥 Export ${type} accounts:`, accounts);
         
-        failed.forEach((acc, idx) => {
-            content += `${idx + 1}. Username: ${acc.username || 'N/A'}\n`;
-            content += `   Status: ${acc.status}\n`;
-            content += `   Lỗi: ${acc.message}\n`;
-            content += `   Cookie: ${acc.cookie}\n`;
-            content += `   Proxy: ${acc.proxy}\n`;
-            content += `\n`;
+        // Tạo nội dung file với format mới
+        let content = `=== INSTAGRAM ACCOUNTS ${type.toUpperCase()} ===\n`;
+        content += `Exported: ${new Date().toLocaleString('vi-VN')}\n`;
+        content += `Total: ${accounts.length}\n\n`;
+        content += 'USERNAME | STATUS | MESSAGE | COOKIE | PROXY\n';
+        content += '='.repeat(150) + '\n';
+        
+        accounts.forEach((acc, idx) => {
+            const username = acc.username || 'N/A';
+            const status = acc.status || 'N/A';
+            const message = acc.message || 'N/A';
+            const cookie = acc.cookie || 'N/A'; // Lấy FULL cookie, không cắt
+            const proxy = acc.proxy || 'N/A';
+            
+            // Format: Username | Status | Message | Cookie đầy đủ | Proxy
+            content += `${username} | ${status} | ${message} | ${cookie} | ${proxy}\n`;
         });
         
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `instagram_errors_${Date.now()}.txt`;
-        a.click();
-        window.URL.revokeObjectURL(url);
+        // Tạo Blob và download
+        const blob = new Blob([content], { type: 'text/plain; charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `instagram_${type}_${Date.now()}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
         
-        this.showNotification('✅ Đã export danh sách lỗi', 'success');
+        this.showNotification(`✅ Đã export ${accounts.length} accounts (${type})`, 'success');
     }
     hideProgressModal() {
         const modal = document.getElementById('progress-modal');

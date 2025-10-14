@@ -564,6 +564,7 @@ class RunnerTreeView {
         const delay = parseInt(document.getElementById('runner-delay').value) || 3000;
         const taskType = document.getElementById('task-type').value || 'all';
         const threadCount = parseInt(document.getElementById('thread-count').value) || 1;
+        const threadCountCookie = parseInt(document.getElementById('thread-count-cookie').value) || 1;
         const switch_account = parseInt(document.getElementById('switch-account-after').value) || 10;
         const stop_account = parseInt(document.getElementById('stop-account-after').value) || 50;
 
@@ -579,6 +580,7 @@ class RunnerTreeView {
             delay: delay,
             taskType: taskType,
             threadCount: threadCount,
+            threadCountCookie: threadCountCookie,
             switch_account: switch_account,
             stop_account: stop_account,
             ...runnerData

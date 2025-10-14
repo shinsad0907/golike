@@ -142,7 +142,7 @@ class InstagramManager:
             
             result = response.json()
             self.log(f"[FOLLOW] Result: {result}")
-            sleep(10)
+            sleep(5)
             return result
             
         except Exception as e:
@@ -311,39 +311,38 @@ class InstagramManager:
             
             # Check trên GoLike
             exists, id_golike = self.check_account_golike(username)
-            
-            if exists:
-                # Update cookie
-                self.update_cookie(username, cookie, proxy, id_golike)
-                self.log(f"[CHECK USER] ✅ HOÀN THÀNH - Updated: {username}")
-                return {
-                    'success': True,
-                    'status': 'updated',
-                    'message': 'Đã cập nhật',
-                    'username': username,
-                    'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
-                    'proxy': proxy
-                }
-            else:
-                # Follow và thêm mới
-                self.log(f"[CHECK USER] Cần follow và thêm mới...")
-                follow_result = self.follow_account(proxy)
-                
-                if follow_result.get('status') == 'error':
-                    self.log(f"[CHECK USER] ❌ Lỗi follow!")
+            for i in range(3):
+                if exists:
+                    # Update cookie
+                    self.update_cookie(username, cookie, proxy, id_golike)
+                    self.log(f"[CHECK USER] ✅ HOÀN THÀNH - Updated: {username}")
                     return {
-                        'success': False,
-                        'status': 'error',
-                        'message': 'Lỗi follow account',
+                        'success': True,
+                        'status': 'updated',
+                        'message': 'Đã cập nhật',
                         'username': username,
                         'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
                         'proxy': proxy
                     }
-                
-                time.sleep(1)
-                
-                result = self.add_account_golike(username)
-                for i in range(3):
+                else:
+                    # Follow và thêm mới
+                    self.log(f"[CHECK USER] Cần follow và thêm mới...")
+                    follow_result = self.follow_account(proxy)
+                    
+                    if follow_result.get('status') == 'error':
+                        self.log(f"[CHECK USER] ❌ Lỗi follow!")
+                        return {
+                            'success': False,
+                            'status': 'error',
+                            'message': 'Lỗi follow account',
+                            'username': username,
+                            'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
+                            'proxy': proxy
+                        }
+                    
+                    time.sleep(1)
+                    
+                    result = self.add_account_golike(username)
                     if result.get('status') == 200:
                         id_golike = result.get('data', {}).get('id')
                         self.update_cookie(username, cookie, proxy, id_golike)
@@ -358,8 +357,7 @@ class InstagramManager:
                         }
                     else:
                         self.log(f"[CHECK USER] ❌ GoLike Error: {result}")
-                        time.sleep(3)
-                    
+                
         except Exception as e:
             self.log(f"[CHECK USER] ❌ EXCEPTION: {str(e)}")
             return {
