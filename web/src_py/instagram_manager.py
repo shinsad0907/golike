@@ -10,12 +10,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # ❌ KHÔNG redirect stdout/stderr - sẽ làm hỏng Eel!
 # Chỉ cần bảo vệ flush() method trong hàm log()
 
-json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
+json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data/manager-golike.json'))
 
 class InstagramManager:
     def __init__(self, account):
         self.account = account
-        
+        print(f"InstagramManager init with account: {self.account}")
         with open(json_path, 'r', encoding='utf-8') as f:
             self.data_manager_golike = json.load(f)
         
