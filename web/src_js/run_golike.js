@@ -26,6 +26,31 @@ class RunnerTreeView {
         }, 2000);
     }
 
+    // ✅ THÊM HÀM REMOVE DUPLICATES CHO JAVASCRIPT
+    removeDuplicates(accounts) {
+        if (!Array.isArray(accounts)) return accounts;
+        
+        accounts.forEach(account => {
+            if (account.instagram_accounts && Array.isArray(account.instagram_accounts)) {
+                const seenIds = new Set();
+                const uniqueIG = [];
+                
+                account.instagram_accounts.forEach(ig => {
+                    const igId = ig.id;
+                    if (igId && !seenIds.has(igId)) {
+                        seenIds.add(igId);
+                        uniqueIG.push(ig);
+                    }
+                });
+                
+                account.instagram_accounts = uniqueIG;
+                console.log(`✅ Cleaned: ${account.username_account} - ${uniqueIG.length} unique IG accounts`);
+            }
+        });
+        
+        return accounts;
+    }
+
     async pollBackendStats() {
         if (!this.isRunning) return;
         
@@ -51,9 +76,9 @@ class RunnerTreeView {
     }
 
     bindEvents() {
-        // Header buttons
         const startBtn = document.getElementById('start-runner-btn');
         const stopBtn = document.getElementById('stop-runner-btn');
+        const resetBtn = document.getElementById('reset-check-btn');
         
         if (startBtn) {
             startBtn.addEventListener('click', () => this.startRunner());
@@ -61,8 +86,10 @@ class RunnerTreeView {
         if (stopBtn) {
             stopBtn.addEventListener('click', () => this.stopRunner());
         }
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => this.resetCheckStatus());
+        }
         
-        // TreeView actions
         const expandAllBtn = document.getElementById('expand-all-btn');
         const collapseAllBtn = document.getElementById('collapse-all-btn');
         const refreshBtn = document.getElementById('refresh-accounts-btn');
@@ -77,7 +104,6 @@ class RunnerTreeView {
             refreshBtn.addEventListener('click', () => this.loadAccountsData());
         }
         
-        // Log actions
         const clearLogBtn = document.getElementById('clear-log-btn');
         const exportLogBtn = document.getElementById('export-log-btn');
         
@@ -88,7 +114,6 @@ class RunnerTreeView {
             exportLogBtn.addEventListener('click', () => this.exportLog());
         }
         
-        // Select all checkbox
         const selectAllCheckbox = document.getElementById('select-all-tree');
         if (selectAllCheckbox) {
             selectAllCheckbox.addEventListener('change', (e) => {
@@ -101,24 +126,32 @@ class RunnerTreeView {
         try {
             this.addLog('info', 'Đang tải dữ liệu tài khoản...');
             
-            // Kiểm tra xem eel có tồn tại không
             if (typeof eel === 'undefined') {
                 console.error('Eel không tồn tại - sử dụng dữ liệu mẫu');
                 this.loadSampleData();
                 return;
             }
             
-            // Load data from manager-golike.json using eel function
             const result = await eel.read_json_file('data/manager-golike.json')();
             
             if (result && result.success) {
-                this.accounts = result.data || [];
+                // ✅ REMOVE DUPLICATES NGAY SAU KHI LOAD
+                this.accounts = this.removeDuplicates(result.data || []);
+                
+                // Lọc chỉ giữ Instagram accounts có cookie
+                this.filterAccountsWithCookie();
+                
                 this.renderTreeView();
                 this.updateAccountStats();
-                this.addLog('success', `Đã tải ${this.accounts.length} tài khoản GoLike`);
                 
-                if (this.accounts.length === 0) {
-                    this.addLog('warning', 'Chưa có tài khoản GoLike nào. Vui lòng thêm tài khoản ở tab "QUẢN LÝ TK GOLIKE"');
+                const totalIGWithCookie = this.accounts.reduce((sum, acc) => 
+                    sum + (acc.instagram_accounts ? acc.instagram_accounts.length : 0), 0
+                );
+                
+                this.addLog('success', `Đã tải ${this.accounts.length} tài khoản GoLike với ${totalIGWithCookie} Instagram có cookie`);
+                
+                if (totalIGWithCookie === 0) {
+                    this.addLog('warning', 'Không có tài khoản Instagram nào có cookie. Vui lòng thêm cookie ở tab "QUẢN LÝ TK Instagram"');
                 }
             } else {
                 throw new Error(result ? result.error : 'Không nhận được phản hồi từ backend');
@@ -127,63 +160,77 @@ class RunnerTreeView {
         } catch (error) {
             console.error('Lỗi tải dữ liệu:', error);
             this.addLog('error', `Lỗi tải dữ liệu: ${error.message}`);
-            // Fallback to sample data hoặc empty array
             this.loadSampleData();
         }
     }
 
-    // Thêm method loadSampleData để test
-    loadSampleData() {
-        this.accounts = [
-            {
-                id: 'sample-1',
-                name_account: 'Test Account',
-                username_account: 'testuser',
-                authorization: 'Bearer test',
-                id_account: 'test123',
-                status: 'ready',
-                pending_coin: 1000,
-                total_coin: 5000,
-                instagram_accounts: [
-                    {
-                        id: 'ig-1',
-                        instagram_username: 'testinstagram',
-                        id_account_golike: 'ig123',
-                        golike_account_id: 'sample-1',
-                        status: 'ready',
-                        cookie: '',
-                        proxy: '',
-                        created_at: new Date().toISOString()
+    filterAccountsWithCookie() {
+        console.log('Filtering accounts with cookies...');
+        
+        // ✅ BỔ SUNG: Remove duplicates trước khi filter
+        this.accounts = this.removeDuplicates(this.accounts);
+        
+        // Lọc và chỉ giữ lại các Instagram accounts có cookie (không rỗng)
+        this.accounts = this.accounts.map(account => {
+            if (account.instagram_accounts && Array.isArray(account.instagram_accounts)) {
+                const filteredIG = account.instagram_accounts.filter(ig => {
+                    const hasCookie = ig.cookie && typeof ig.cookie === 'string' && ig.cookie.trim() !== '';
+                    
+                    if (hasCookie) {
+                        console.log(`✓ Giữ lại: ${ig.instagram_username} - có cookie (${ig.cookie.length} ký tự)`);
+                    } else {
+                        console.log(`✗ Loại bỏ: ${ig.instagram_username} - không có cookie hoặc cookie rỗng`);
                     }
-                ]
+                    
+                    return hasCookie;
+                });
+                
+                return {
+                    ...account,
+                    instagram_accounts: filteredIG
+                };
             }
-        ];
+            return account;
+        }).filter(account => {
+            const hasValidIG = account.instagram_accounts && account.instagram_accounts.length > 0;
+            
+            if (!hasValidIG) {
+                console.log(`✗ Loại bỏ GoLike account: ${account.username_account} - không có IG nào có cookie`);
+            }
+            
+            return hasValidIG;
+        });
+        
+        console.log(`Kết quả: ${this.accounts.length} GoLike accounts với IG có cookie`);
+    }
+
+    loadSampleData() {
+        this.accounts = [];
         this.renderTreeView();
         this.updateAccountStats();
-        this.addLog('info', 'Đã tải dữ liệu mẫu để test');
+        this.addLog('info', 'Không có dữ liệu mẫu - vui lòng thêm tài khoản');
     }
 
     renderTreeView() {
         const tbody = document.getElementById('tree-tbody');
         
-        // Kiểm tra xem tbody có tồn tại không
         if (!tbody) {
             console.error('Không tìm thấy element #tree-tbody');
             this.addLog('error', 'Không tìm thấy bảng TreeView trong DOM');
             return;
         }
 
-        // Clear existing content
         tbody.innerHTML = '';
 
-        // Kiểm tra xem có accounts không
         if (!this.accounts || this.accounts.length === 0) {
             const emptyRow = document.createElement('tr');
             emptyRow.innerHTML = `
-                <td colspan="6" class="text-center text-muted py-4">
+                <td colspan="7" class="text-center text-muted py-4">
                     <i class="fas fa-inbox"></i>
                     <br>
-                    Chưa có tài khoản nào
+                    <strong>Chưa có tài khoản Instagram nào có cookie</strong>
+                    <br>
+                    <small>Vui lòng thêm cookie cho Instagram ở tab "QUẢN LÝ TK Instagram"</small>
                 </td>
             `;
             tbody.appendChild(emptyRow);
@@ -194,33 +241,25 @@ class RunnerTreeView {
 
         this.accounts.forEach((account, index) => {
             try {
-                // Render parent row (GoLike account)
                 const parentRow = this.createAccountRow(account);
                 if (parentRow) {
                     tbody.appendChild(parentRow);
-                    console.log(`Đã thêm tài khoản ${index + 1}: ${account.name_account}`);
 
-                    // Render child rows (Instagram accounts)
                     if (account.instagram_accounts && Array.isArray(account.instagram_accounts)) {
                         account.instagram_accounts.forEach((igAccount, igIndex) => {
                             try {
                                 const childRow = this.createInstagramRow(igAccount, account.id);
                                 if (childRow) {
                                     tbody.appendChild(childRow);
-                                    console.log(`  Đã thêm Instagram ${igIndex + 1}: @${igAccount.instagram_username}`);
-                                } else {
-                                    console.warn(`Không tạo được row cho Instagram: ${igAccount.instagram_username}`);
                                 }
                             } catch (igError) {
-                                console.error(`Lỗi tạo Instagram row cho ${igAccount.instagram_username}:`, igError);
+                                console.error(`Lỗi tạo Instagram row:`, igError);
                             }
                         });
                     }
-                } else {
-                    console.warn(`Không tạo được row cho account: ${account.name_account}`);
                 }
             } catch (accountError) {
-                console.error(`Lỗi tạo account row cho ${account.name_account}:`, accountError);
+                console.error(`Lỗi tạo account row:`, accountError);
             }
         });
 
@@ -264,9 +303,11 @@ class RunnerTreeView {
                 <td class="text-center">
                     <span class="ig-count">${igCount}</span>
                 </td>
+                <td class="text-center">
+                    -
+                </td>
             `;
 
-            // Add click event for expand/collapse
             const toggle = row.querySelector('.tree-toggle');
             if (toggle && igCount > 0) {
                 toggle.addEventListener('click', (e) => {
@@ -277,7 +318,6 @@ class RunnerTreeView {
                 toggle.style.cursor = 'pointer';
             }
 
-            // Add checkbox event
             const checkbox = row.querySelector('.account-checkbox');
             if (checkbox) {
                 checkbox.addEventListener('change', (e) => {
@@ -304,6 +344,11 @@ class RunnerTreeView {
                 new Date(igAccount.created_at).toLocaleDateString('vi-VN') : 
                 'N/A';
 
+            const isChecked = igAccount.checked === true;
+            const checkStatusClass = isChecked ? 'checked' : 'unchecked';
+            const checkStatusText = isChecked ? 'Đã chạy' : 'Chưa chạy';
+            const checkStatusIcon = isChecked ? 'fa-check-circle' : 'fa-circle';
+
             row.innerHTML = `
                 <td class="checkbox-col">
                     <input type="checkbox" class="ig-checkbox" data-ig-id="${igAccount.id}" data-parent-id="${parentId}">
@@ -324,12 +369,18 @@ class RunnerTreeView {
                 <td colspan="3" class="ig-info">
                     <small class="text-muted">
                         ID: ${this.escapeHtml(igAccount.id_account_golike || 'N/A')} | 
-                        Thêm: ${createdDate}
+                        Thêm: ${createdDate} |
+                        Cookie: ${igAccount.cookie.substring(0, 20)}...
                     </small>
+                </td>
+                <td class="text-center">
+                    <span class="check-status ${checkStatusClass}">
+                        <i class="fas ${checkStatusIcon}"></i>
+                        ${checkStatusText}
+                    </span>
                 </td>
             `;
 
-            // Add checkbox event
             const checkbox = row.querySelector('.ig-checkbox');
             if (checkbox) {
                 checkbox.addEventListener('change', (e) => {
@@ -344,7 +395,6 @@ class RunnerTreeView {
         }
     }
 
-    // Thêm method để escape HTML
     escapeHtml(text) {
         if (typeof text !== 'string') return text;
         const map = {
@@ -366,7 +416,6 @@ class RunnerTreeView {
             this.expandedNodes.add(accountId);
         }
         
-        // Update toggle icon
         const toggle = document.querySelector(`[data-account-id="${accountId}"].tree-toggle`);
         if (toggle) {
             const icon = toggle.querySelector('i');
@@ -381,7 +430,6 @@ class RunnerTreeView {
             }
         }
         
-        // Show/hide child rows
         const childRows = document.querySelectorAll(`[data-parent-id="${accountId}"]`);
         childRows.forEach(row => {
             row.style.display = isExpanded ? 'none' : 'table-row';
@@ -411,7 +459,6 @@ class RunnerTreeView {
             this.selectedAccounts.delete(accountId);
         }
 
-        // Auto select/deselect all Instagram accounts of this GoLike account
         const account = this.accounts.find(acc => acc.id === accountId);
         if (account && account.instagram_accounts) {
             account.instagram_accounts.forEach(igAccount => {
@@ -430,13 +477,10 @@ class RunnerTreeView {
         const key = `${parentId}-${igId}`;
         if (checked) {
             this.selectedInstagram.add(key);
-            console.log('Added Instagram:', key);
         } else {
             this.selectedInstagram.delete(key);
-            console.log('Removed Instagram:', key);
         }
 
-        // Check if parent should be selected
         const account = this.accounts.find(acc => acc.id === parentId);
         if (account && account.instagram_accounts) {
             const allSelected = account.instagram_accounts.every(igAccount => {
@@ -455,7 +499,6 @@ class RunnerTreeView {
         }
 
         this.updateSelectionCount();
-        this.debugSelection();
     }
 
     selectAll(checked) {
@@ -476,6 +519,30 @@ class RunnerTreeView {
         });
     }
 
+    async resetCheckStatus() {
+        if (!confirm('Bạn có chắc muốn reset trạng thái "Đã chạy" của tất cả tài khoản Instagram về "Chưa chạy"?')) {
+            return;
+        }
+        
+        try {
+            this.addLog('info', 'Đang reset trạng thái...');
+            
+            // ✅ SỬ DỤNG HÀM BACKEND ĐÃ CÓ
+            const result = await eel.reset_checked_status_all()();
+            
+            if (result && result.success) {
+                this.addLog('success', `Đã reset ${result.reset_count} tài khoản thành công`);
+                await this.loadAccountsData();
+            } else {
+                throw new Error(result ? result.error : 'Không reset được');
+            }
+            
+        } catch (error) {
+            console.error('Lỗi reset:', error);
+            this.addLog('error', `Lỗi reset trạng thái: ${error.message}`);
+        }
+    }
+
     async startRunner() {
         if (this.selectedInstagram.size === 0) {
             this.addLog('error', 'Vui lòng chọn ít nhất một tài khoản Instagram để chạy');
@@ -486,7 +553,6 @@ class RunnerTreeView {
         document.getElementById('start-runner-btn').disabled = true;
         document.getElementById('stop-runner-btn').disabled = false;
 
-        // Reset stats khi bắt đầu
         this.runningStats = {
             totalNVU: 0,
             totalBalance: 0,
@@ -504,7 +570,9 @@ class RunnerTreeView {
         this.addLog('success', `Bắt đầu chạy ${this.selectedInstagram.size} tài khoản Instagram với ${threadCount} luồng`);
         this.addLog('info', `Delay: ${delay/1000}s | Loại NVU: ${taskType}`);
 
-        // Chuẩn bị dữ liệu JSON gửi về backend
+        // ✅ SỬ DỤNG HÀM BACKEND update_checked_status_only ĐỂ TRÁNH DUPLICATE
+        await this.markAccountsAsChecked();
+
         const runnerData = this.prepareRunnerData();
         
         const configData = {
@@ -529,7 +597,6 @@ class RunnerTreeView {
                     throw new Error(result ? result.error : 'Không nhận được phản hồi từ backend');
                 }
             } else {
-                // Fallback - simulation mode
                 this.addLog('warning', 'Chạy ở chế độ simulation (không có backend)');
                 this.simulateRunning();
             }
@@ -541,26 +608,36 @@ class RunnerTreeView {
         }
     }
 
-    debugSelection() {
-        console.log('=== DEBUG SELECTION ===');
-        console.log('Selected accounts:', Array.from(this.selectedAccounts));
-        console.log('Selected Instagram:', Array.from(this.selectedInstagram));
-        
-        this.selectedInstagram.forEach(key => {
-            const [parentId, igId] = key.split('-');
-            const golikeAccount = this.accounts.find(acc => acc.id === parentId);
-            const igAccount = golikeAccount?.instagram_accounts?.find(ig => ig.id === igId);
+    async markAccountsAsChecked() {
+        try {
+            this.addLog('info', 'Đang đánh dấu tài khoản đã chạy...');
             
-            console.log(`${key}:`, {
-                golike: golikeAccount?.username_account,
-                instagram: igAccount?.instagram_username
+            // ✅ CHỈ GỬI DANH SÁCH IG IDs CẦN MARK - KHÔNG ĐỌC/GHI FILE Ở FRONTEND
+            const igIdsToMark = Array.from(this.selectedInstagram).map(key => {
+                const [parentId, igId] = key.split('-');
+                return igId;
             });
-        });
+            
+            const result = await eel.update_checked_status_only(JSON.stringify(igIdsToMark))();
+            
+            if (result && result.success) {
+                this.addLog('success', `Đã đánh dấu ${result.marked_count} tài khoản là "Đã chạy"`);
+                // Reload data để hiển thị trạng thái mới
+                await this.loadAccountsData();
+            } else {
+                throw new Error(result ? result.error : 'Không đánh dấu được');
+            }
+            
+        } catch (error) {
+            console.error('Lỗi đánh dấu checked:', error);
+            this.addLog('warning', `Không lưu được trạng thái: ${error.message}`);
+        }
     }
 
     prepareRunnerData() {
         const golikeAccountsMap = new Map();
 
+        // ✅ ĐẢM BẢO KHÔNG DUPLICATE KHI CHUẨN BỊ DATA
         this.selectedInstagram.forEach(key => {
             const [parentId, igId] = key.split('-');
             
@@ -583,16 +660,27 @@ class RunnerTreeView {
                 const igAccount = golikeAccount.instagram_accounts?.find(ig => ig.id === igId);
                 if (igAccount) {
                     const currentGolikeData = golikeAccountsMap.get(parentId);
-                    currentGolikeData.instagram_accounts.push({
-                        id: igAccount.id,
-                        username: igAccount.instagram_username,
-                        id_account_golike: igAccount.id_account_golike,
-                        golike_account_id: igAccount.golike_account_id,
-                        status: igAccount.status,
-                        cookie: igAccount.cookie || '',
-                        proxy: igAccount.proxy || '',
-                        created_at: igAccount.created_at
-                    });
+                    
+                    // ✅ KIỂM TRA TRÙNG TRƯỚC KHI THÊM
+                    const alreadyExists = currentGolikeData.instagram_accounts.some(
+                        existing => existing.id === igAccount.id
+                    );
+                    
+                    if (!alreadyExists) {
+                        currentGolikeData.instagram_accounts.push({
+                            id: igAccount.id,
+                            username: igAccount.instagram_username,
+                            id_account_golike: igAccount.id_account_golike,
+                            golike_account_id: igAccount.golike_account_id,
+                            status: igAccount.status,
+                            cookie: igAccount.cookie || '',
+                            proxy: igAccount.proxy || '',
+                            checked: true,
+                            created_at: igAccount.created_at
+                        });
+                    } else {
+                        console.log(`⚠️ Bỏ qua duplicate IG: ${igAccount.instagram_username}`);
+                    }
                 }
             }
         });
@@ -602,15 +690,7 @@ class RunnerTreeView {
             sum + acc.instagram_accounts.length, 0
         );
 
-        this.addLog('info', `Đã chuẩn bị ${golikeAccounts.length} tài khoản GoLike và ${totalInstagramAccounts} tài khoản Instagram`);
-        
-        console.log('Selected Instagram keys:', Array.from(this.selectedInstagram));
-        console.log('Prepared data structure:', { golike_accounts: golikeAccounts });
-        
-        golikeAccounts.forEach(golike => {
-            console.log(`GoLike: ${golike.username_account} có ${golike.instagram_accounts.length} Instagram accounts:`, 
-                golike.instagram_accounts.map(ig => ig.username));
-        });
+        this.addLog('info', `Đã chuẩn bị ${golikeAccounts.length} tài khoản GoLike và ${totalInstagramAccounts} tài khoản Instagram (không duplicate)`);
         
         return {
             golike_accounts: golikeAccounts
@@ -765,13 +845,11 @@ class RunnerTreeView {
     }
 
     parseLogForStats(message) {
-        // Parse "Hoàn thành nhiệm vụ #X"
         const missionMatch = message.match(/Hoàn thành nhiệm vụ #(\d+)/);
         if (missionMatch) {
             this.runningStats.totalNVU = Math.max(this.runningStats.totalNVU, parseInt(missionMatch[1]));
         }
         
-        // Parse "Thu nhập: +XXXđ | Tổng: XXXđ"
         const earningsMatch = message.match(/Thu nhập: \+(\d+)đ \| Tổng: (\d+)đ/);
         if (earningsMatch) {
             const currentEarning = parseInt(earningsMatch[1]);
@@ -780,7 +858,6 @@ class RunnerTreeView {
             this.runningStats.completedMissions++;
         }
         
-        // Parse "Đã dừng tài khoản"
         if (message.includes('Đã dừng tài khoản') || message.includes('Hoàn thành') && message.includes('nhiệm vụ cho tài khoản')) {
             this.runningStats.runningCount = Math.max(0, this.runningStats.runningCount - 1);
         }
@@ -850,7 +927,6 @@ window.updateRunnerLog = function(message) {
 
 // Khởi tạo khi DOM ready
 document.addEventListener('DOMContentLoaded', function() {
-    // Kiểm tra xem các elements cần thiết có tồn tại không
     const requiredElements = [
         'tree-tbody',
         'log-content',
@@ -871,7 +947,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // Khởi tạo TreeView
     window.runnerTreeView = new RunnerTreeView();
     console.log('RunnerTreeView đã được khởi tạo thành công');
 });

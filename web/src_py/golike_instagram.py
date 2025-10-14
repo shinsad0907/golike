@@ -18,6 +18,7 @@ class GolikeInstagram:
 
         # Session cache cho mỗi IG account
         self.session_cache = {}
+        self.exhausted_ig_accounts = set()
         
         self.base_headers = {
             'accept': '*/*',
@@ -188,6 +189,10 @@ class GolikeInstagram:
 
     def get_homepage(self, session_data, ig_account):
         """Get homepage data và cache lại"""
+        # CHECK IS_RUNNING TRƯỚC KHI LẤY HOMEPAGE
+        if not self.is_running:
+            return None
+            
         # Nếu đã có cache và chưa quá cũ (< 5 phút), dùng cache
         if session_data['homepage_data'] and session_data['last_used']:
             import time
@@ -200,7 +205,13 @@ class GolikeInstagram:
         headers['x-csrftoken'] = ig_account['cookie'].split('csrftoken=')[1].split(';')[0]
         
         try:
-            response = session.get('https://www.instagram.com/', headers=headers, timeout=15)
+            # GIẢM TIMEOUT ĐỂ DỄ HỦY
+            response = session.get('https://www.instagram.com/', headers=headers, timeout=10)
+            
+            # CHECK IS_RUNNING SAU KHI REQUEST
+            if not self.is_running:
+                return None
+                
             text = response.text
             
             jazoest = text.split('jazoest=')[1].split('"')[0]
@@ -227,6 +238,10 @@ class GolikeInstagram:
 
     def follow_user(self, session, headers, homepage_data, user_id):
         """Follow user với session đã có"""
+        # CHECK IS_RUNNING TRƯỚC KHI FOLLOW
+        if not self.is_running:
+            return {'status': 'stopped', 'message': 'Runner stopped'}
+            
         headers_copy = headers.copy()
         headers_copy['x-root-field-name'] = 'xdt_api__v1__friendships__create__target_user_id'
         
@@ -240,15 +255,25 @@ class GolikeInstagram:
         }
         
         try:
+            # GIẢM TIMEOUT
             response = session.post('https://www.instagram.com/graphql/query', 
-                                   headers=headers_copy, data=data, timeout=15)
+                                headers=headers_copy, data=data, timeout=10)
+            
+            # CHECK IS_RUNNING SAU REQUEST
+            if not self.is_running:
+                return {'status': 'stopped', 'message': 'Runner stopped'}
+                
             return response.json()
         except Exception as e:
             print(f"❌ Error following user: {e}")
             return {'status': 'error', 'message': str(e)}
-    
+
     def like_post(self, session, headers, homepage_data, media_id):
         """Like post với session đã có"""
+        # CHECK IS_RUNNING TRƯỚC KHI LIKE
+        if not self.is_running:
+            return {'status': 'stopped', 'message': 'Runner stopped'}
+            
         headers_copy = headers.copy()
         headers_copy['x-root-field-name'] = 'xdt_mark_media_like'
         
@@ -263,12 +288,29 @@ class GolikeInstagram:
         }
         
         try:
+            # GIẢM TIMEOUT
             response = session.post('https://www.instagram.com/graphql/query', 
-                                   headers=headers_copy, data=data, timeout=15)
+                                headers=headers_copy, data=data, timeout=10)
+            
+            # CHECK IS_RUNNING SAU REQUEST
+            if not self.is_running:
+                return {'status': 'stopped', 'message': 'Runner stopped'}
+                
             return response.json()
         except Exception as e:
             print(f"❌ Error liking post: {e}")
             return {'status': 'error', 'message': str(e)}
+
+    def check_all_accounts_exhausted(self, data_account):
+        """Kiểm tra xem tất cả IG accounts của GoLike account này đã hết nhiệm vụ chưa"""
+        total_ig_accounts = len(data_account['instagram_accounts'])
+        exhausted_count = sum(
+            1 for acc in data_account['instagram_accounts'] 
+            if acc['id_account_golike'] in self.exhausted_ig_accounts
+        )
+        return exhausted_count == total_ig_accounts
+
+    # Chỉ thay thế method run_mission() trong class GolikeInstagram
 
     def run_mission(self, data_account):
         """Run missions cho một GoLike account"""
@@ -289,15 +331,25 @@ class GolikeInstagram:
                 except:
                     pass
                 break
+            
+            if self.check_all_accounts_exhausted(data_account):
+                try:
+                    import eel
+                    eel.update_runner_log(f"🚫 Tất cả Instagram accounts của {data_account['username_account']} đã hết nhiệm vụ!")
+                    eel.update_runner_log(f"⏹️ Dừng GoLike account: {data_account['username_account']}")
+                except:
+                    pass
+                break
                 
             for account_ig in data_account['instagram_accounts']:
                 if not self.is_running:
                     break
                 
-                # Lấy proxy từ IG account
+                if account_ig['id_account_golike'] in self.exhausted_ig_accounts:
+                    continue
+                
                 proxy_string = account_ig.get('proxy', None)
                 
-                # Get or create session với proxy
                 session_data = self.get_or_create_session(
                     account_ig['id'], 
                     proxy_string
@@ -305,25 +357,19 @@ class GolikeInstagram:
                 
                 session = session_data['session']
                 
-                # ✅ KIỂM TRA PROXY TRƯỚC KHI LÀM VIỆC (chỉ check 1 lần cho mỗi session)
                 if not session_data['proxy_checked']:
-                   
-                    
+                    if not self.is_running:
+                        break
                     proxy_info = self.check_proxy_location(session, proxy_string)
                     session_data['proxy_info'] = proxy_info
                     session_data['proxy_checked'] = True
-                else:
-                    # Nếu đã check rồi, log lại thông tin
-                    if session_data['proxy_info']:
-                        proxy_info = session_data['proxy_info']
-                        
                 
-                # Setup headers
                 headers = self.base_headers.copy()
                 headers['x-csrftoken'] = account_ig['cookie'].split('csrftoken=')[1].split(';')[0]
                 headers['cookie'] = account_ig['cookie']
                 
-                # Get homepage data (cached)
+                if not self.is_running:
+                    break
                 homepage_data = self.get_homepage(session_data, account_ig)
                 
                 if not homepage_data:
@@ -337,24 +383,46 @@ class GolikeInstagram:
                 for i in range(self.switch_account):
                     if not self.is_running:
                         break
+                    
+                    if account_ig['id_account_golike'] in self.exhausted_ig_accounts:
+                        break
                         
                     try:
-                        mission_golike = Get_golike(data_account['authorization'], account_ig['id_account_golike']).get_instagram()
-                        print(mission_golike)
-                        if int(mission_golike['status']) == 400:
+                        if not self.is_running:
                             break
+                            
+                        mission_golike = Get_golike(data_account['authorization'], account_ig['id_account_golike']).get_instagram()
+                        
+                        if not self.is_running:
+                            break
+                        
+                        print(mission_golike)
+                        
+                        if int(mission_golike['status']) == 400:
+                            self.exhausted_ig_accounts.add(account_ig['id_account_golike'])
+                            try:
+                                import eel
+                                eel.update_runner_log(f"⚠️ Instagram account @{account_ig['username']} (ID: {account_ig['id_account_golike']}) đã hết nhiệm vụ!")
+                                
+                                remaining = len(data_account['instagram_accounts']) - len(
+                                    [acc for acc in data_account['instagram_accounts'] 
+                                    if acc['id_account_golike'] in self.exhausted_ig_accounts]
+                                )
+                                if remaining > 0:
+                                    eel.update_runner_log(f"🔄 Chuyển sang account khác - Còn {remaining} account đang hoạt động")
+                                else:
+                                    eel.update_runner_log(f"🛑 Tất cả Instagram accounts đã hết nhiệm vụ!")
+                            except:
+                                pass
+                            break
+                        
+                        if not self.is_running:
+                            break
+                        
                         task_icons = {'follow': '👥', 'like': '❤️', 'comment': '💬'}
                         task_names = {'follow': 'Follow', 'like': 'Like', 'comment': 'Comment'}
                         icon = task_icons.get(mission_golike['type'], '⚡')
                         task_name = task_names.get(mission_golike['type'], mission_golike['type'])
-                        
-                        # Log proxy info trước khi thực hiện task
-                        try:
-                            import eel
-                            if session_data['proxy_info']:
-                                pi = session_data['proxy_info']
-                        except:
-                            pass
                         
                         # Thực hiện nhiệm vụ
                         if mission_golike['type'] == 'follow':
@@ -362,6 +430,8 @@ class GolikeInstagram:
                         elif mission_golike['type'] == 'like':
                             status = self.like_post(session, headers, homepage_data, mission_golike['object_id'])
                         elif mission_golike['type'] == 'comment':
+                            if not self.is_running:
+                                break
                             Get_golike(data_account['authorization'], account_ig['id_account_golike']).skip_job(
                                 mission_golike['id_nv'], account_ig['id_account_golike'], 
                                 mission_golike['object_id'], mission_golike['type']
@@ -373,11 +443,24 @@ class GolikeInstagram:
                                 pass
                             continue
                         
+                        if not self.is_running:
+                            break
+                        
+                        # Kiểm tra nếu status là 'stopped' (do runner đã dừng)
+                        if status.get('status') == 'stopped':
+                            break
+                        
                         # Kiểm tra kết quả
                         if status.get('status') == 'ok':
+                            if not self.is_running:
+                                break
+                                
                             status_complete = Get_golike(data_account['authorization'], account_ig['id_account_golike']).complete_job(
                                 mission_golike['id_nv'], account_ig['id_account_golike']
                             )
+                            
+                            if not self.is_running:
+                                break
                             
                             if status_complete:
                                 mission_earning = int(mission_golike['price_after_cost'])
@@ -398,8 +481,21 @@ class GolikeInstagram:
                                     pass
                                 
                                 self.send_stats_update()
-                                sleep(self.delay)
+                                
+                                if not self.is_running:
+                                    break
+                                
+                                # THAY ĐỔI: SLEEP TỪNG ĐOẠN NHỎ ĐỂ DỄ HỦY
+                                delay_remaining = self.delay
+                                while delay_remaining > 0 and self.is_running:
+                                    sleep_time = min(0.5, delay_remaining)  # Sleep từng 0.5 giây
+                                    sleep(sleep_time)
+                                    delay_remaining -= sleep_time
+                                    if not self.is_running:
+                                        break
                             else:
+                                if not self.is_running:
+                                    break
                                 Get_golike(data_account['authorization'], account_ig['id_account_golike']).skip_job(
                                     mission_golike['id_nv'], account_ig['id_account_golike'], 
                                     mission_golike['object_id'], mission_golike['type']
@@ -417,6 +513,8 @@ class GolikeInstagram:
                                 pass
                     
                     except Exception as e:
+                        if not self.is_running:
+                            break
                         try:
                             import eel
                             eel.update_runner_log(f"💥 Lỗi xử lý nhiệm vụ: {str(e)}")

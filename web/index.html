@@ -490,10 +490,15 @@
 
 
             <!-- Runner Tab -->
+            <!-- Runner Tab - Phần cần thay thế trong HTML -->
             <div id="runner-tab" class="tab-pane">
                 <div class="tab-header">
                     <h2>CHẠY GOLIKE AUTOMATION</h2>
                     <div class="header-actions">
+                        <button class="btn btn-warning" id="reset-check-btn">
+                            <i class="fas fa-redo"></i>
+                            RESET TRẠNG THÁI
+                        </button>
                         <button class="btn btn-success" id="start-runner-btn">
                             <i class="fas fa-rocket"></i>
                             BẮT ĐẦU CHẠY
@@ -565,12 +570,12 @@
                         <input type="number" id="thread-count" value="3" min="1" max="10" class="form-input">
                     </div>
                     <div class="control-group">
-                        <label>Sau bnhieu nv thì đổi acc</label>
-                        <input type="number" id="switch-account-after" value="5" min="1" max="10" class="form-input">
+                        <label>Sau bao nhiêu NV thì đổi acc:</label>
+                        <input type="number" id="switch-account-after" value="5" min="1" max="100" class="form-input">
                     </div>
                     <div class="control-group">
-                        <label>Sau bnhieu nv thì ngưng</label>
-                        <input type="number" id="stop-account-after" value="5" min="1" max="10" class="form-input">
+                        <label>Sau bao nhiêu NV thì ngừng:</label>
+                        <input type="number" id="stop-account-after" value="50" min="1" max="1000" class="form-input">
                     </div>
                 </div>
 
@@ -610,6 +615,7 @@
                                         <th>PENDING COIN</th>
                                         <th>TOTAL COIN</th>
                                         <th>SỐ IG</th>
+                                        <th>TRẠNG THÁI CHẠY</th>
                                     </tr>
                                 </thead>
                                 <tbody id="tree-tbody">

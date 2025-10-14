@@ -25,23 +25,35 @@ runner_stats = {
     'total_earnings': 0
 }
 
+def remove_duplicates_from_data(data):
+    """
+    Loại bỏ duplicate Instagram accounts dựa trên id
+    """
+    if not isinstance(data, list):
+        return data
+    
+    for golike_acc in data:
+        if 'instagram_accounts' in golike_acc and isinstance(golike_acc['instagram_accounts'], list):
+            # Tạo dict để track unique IDs
+            seen_ids = {}
+            unique_accounts = []
+            
+            for ig_acc in golike_acc['instagram_accounts']:
+                ig_id = ig_acc.get('id')
+                if ig_id and ig_id not in seen_ids:
+                    seen_ids[ig_id] = True
+                    unique_accounts.append(ig_acc)
+            
+            golike_acc['instagram_accounts'] = unique_accounts
+            
+            print(f"✅ Cleaned {len(golike_acc['instagram_accounts'])} unique IG accounts for {golike_acc.get('username_account', 'N/A')}")
+    
+    return data
 
 @eel.expose
 def check_instagram_cookie_single(cookie_data):
-    """
-    Kiểm tra 1 cookie Instagram
-    
-    Args:
-        cookie_data: dict hoặc JSON string chứa:
-            - ig_id: ID của Instagram account
-            - cookie: Cookie string
-            - proxy: (optional) Proxy string
-    
-    Returns:
-        dict: Kết quả check cookie
-    """
+    """Kiểm tra 1 cookie Instagram"""
     try:
-        # Parse nếu là string
         if isinstance(cookie_data, str):
             data = json.loads(cookie_data)
         else:
@@ -67,13 +79,8 @@ def check_instagram_cookie_single(cookie_data):
                 'checked_at': datetime.now().isoformat()
             }
         
-        # Khởi tạo checker
         checker = InstagramCookieChecker(cookie, proxy)
-        
-        # Check cookie
         result = checker.check_user()
-        
-        # Thêm ig_id vào result
         result['ig_id'] = ig_id
         
         print(f"\n✅ Check completed for IG ID: {ig_id}")
@@ -273,34 +280,86 @@ def update_instagram_cookie_status(file_path, ig_id, check_result):
 
 @eel.expose
 def read_json_file(file_path):
+    """
+    Đọc JSON file và tự động remove duplicates
+    """
     try:
         if not os.path.exists(file_path):
             return {"success": True, "data": []}
+        
         with open(file_path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return {"success": True, "data": data}
+        
+        # AUTOMATICALLY CLEAN DUPLICATES
+        cleaned_data = remove_duplicates_from_data(data)
+        
+        return {"success": True, "data": cleaned_data}
     except Exception as e:
+        print(f"❌ Error reading JSON: {str(e)}")
         return {"success": False, "error": str(e)}
+
 
 @eel.expose
 def write_json_file(file_path, data):
+    """
+    Lưu JSON file - LOẠI BỎ DUPLICATES TRƯỚC KHI LƯU
+    """
     try:
         updated_accounts = []
-        print(data)
+        print(f"\n{'='*60}")
+        print(f"💾 SAVING JSON FILE")
+        print(f"{'='*60}")
+        
         for acc in data:
             try:
+                # Get updated account info from API
                 acc_new = GolikeManager(acc).get_me_account()
+                
+                # CRITICAL: Remove duplicates BEFORE adding
+                if 'instagram_accounts' in acc_new:
+                    seen_ids = {}
+                    unique_ig = []
+                    
+                    for ig in acc_new['instagram_accounts']:
+                        ig_id = ig.get('id')
+                        if ig_id and ig_id not in seen_ids:
+                            seen_ids[ig_id] = True
+                            unique_ig.append(ig)
+                    
+                    acc_new['instagram_accounts'] = unique_ig
+                    print(f"   ✅ {acc_new.get('username_account')}: {len(unique_ig)} unique IG accounts")
+                
                 updated_accounts.append(acc_new)
-            except:
-                pass
+                
+            except Exception as e:
+                print(f"   ⚠️ Error updating account: {str(e)}")
+                # Nếu lỗi API, vẫn giữ data cũ nhưng clean duplicates
+                if 'instagram_accounts' in acc:
+                    seen_ids = {}
+                    unique_ig = []
+                    for ig in acc['instagram_accounts']:
+                        ig_id = ig.get('id')
+                        if ig_id and ig_id not in seen_ids:
+                            seen_ids[ig_id] = True
+                            unique_ig.append(ig)
+                    acc['instagram_accounts'] = unique_ig
+                
+                updated_accounts.append(acc)
 
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(updated_accounts, f, ensure_ascii=False, indent=4)
-
+        
+        print(f"✅ Saved successfully - Total accounts: {len(updated_accounts)}")
+        print(f"{'='*60}\n")
+        
         return {"success": True}
+        
     except Exception as e:
+        print(f"❌ Error saving JSON: {str(e)}")
         return {"success": False, "error": str(e)}
+
 @eel.expose
 def write_json_file_groups(file_path, data):
     try:
@@ -446,12 +505,12 @@ def receive_runner_data(json_data):
             'completed_missions': 0,
             'total_earnings': 0
         }
-        print(data)
+        
         # Tạo instance GolikeInstagram và lưu reference
         current_runner_instance = GolikeInstagram(data)
         
         # Gửi thông báo về frontend
-        eel.update_runner_log("🔥 Đã nhận dữ liệu từ frontend - ")
+        eel.update_runner_log("🔥 Đã nhận dữ liệu từ frontend")
         
         # Gửi stats ban đầu
         try:
@@ -467,22 +526,21 @@ def receive_runner_data(json_data):
         return {"success": True, "message": "Đã bắt đầu runner thành công"}
 
     except json.JSONDecodeError as e:
-        print(f"Lỗi parse JSON: {str(e)}")
+        print(f"❌ JSON parse error: {str(e)}")
         return {"success": False, "error": f"Lỗi parse JSON: {str(e)}"}
     except Exception as e:
-        print(f"Lỗi receive_runner_data: {str(e)}")
+        print(f"❌ Error in receive_runner_data: {str(e)}")
         return {"success": False, "error": str(e)}
+
 @eel.expose
 def get_runner_stats():
     """Lấy stats hiện tại của runner"""
     global runner_stats, is_runner_active, current_runner_instance
     
     try:
-        # Cập nhật running count từ instance hiện tại
         actual_running_count = 0
         if current_runner_instance and hasattr(current_runner_instance, 'is_running'):
             if current_runner_instance.is_running:
-                # Đếm số thread đang chạy (có thể từ data hoặc estimate)
                 if runner_data and 'golike_accounts' in runner_data:
                     actual_running_count = sum(len(acc.get('instagram_accounts', [])) 
                                              for acc in runner_data['golike_accounts'])
@@ -496,7 +554,7 @@ def get_runner_stats():
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
-    
+
 @eel.expose 
 def update_runner_stats(stats_data):
     """Cập nhật stats từ runner"""
@@ -506,21 +564,19 @@ def update_runner_stats(stats_data):
         if isinstance(stats_data, str):
             stats_data = json.loads(stats_data)
         
-        # Cập nhật các giá trị stats
         for key, value in stats_data.items():
             if key in runner_stats:
                 runner_stats[key] = value
         
-        # Gửi update về frontend
         try:
             eel.update_runner_stats(runner_stats)
         except:
-            pass  # Frontend có thể không connected
+            pass
         
         return {"success": True}
     except Exception as e:
         return {"success": False, "error": str(e)}
-    
+
 @eel.expose
 def reset_runner_stats():
     """Reset tất cả stats về 0"""
@@ -541,18 +597,32 @@ def reset_runner_stats():
         pass
     
     return {"success": True}
+
 @eel.expose
 def stop_runner():
-    """Dừng runner"""
+    """
+    Dừng runner - FORCE STOP TẤT CẢ THREADS
+    """
     global is_runner_active, runner_data, current_runner_instance, runner_stats
     
     try:
+        print(f"\n{'='*60}")
+        print(f"🛑 STOPPING RUNNER")
+        print(f"{'='*60}")
+        
+        # Set flag đầu tiên
         is_runner_active = False
         
-        # Gọi method stop() của instance hiện tại nếu tồn tại
+        # Stop instance nếu tồn tại
         if current_runner_instance:
+            print("   ⏹️ Stopping current runner instance...")
             current_runner_instance.stop()
+            
+            # Đợi một chút để threads cleanup
+            time.sleep(1)
+            
             current_runner_instance = None
+            print("   ✅ Runner instance stopped")
         
         runner_data = None
         
@@ -562,14 +632,17 @@ def stop_runner():
         # Gửi stats update về frontend
         try:
             eel.update_runner_stats(runner_stats)
+            eel.update_runner_log("✅ Đã dừng runner thành công!")
         except:
             pass
         
-        eel.update_runner_log("✅ Lệnh dừng đã được gửi thành công")
+        print(f"✅ Runner stopped successfully")
+        print(f"{'='*60}\n")
+        
         return {"success": True, "message": "Đã dừng runner"}
         
     except Exception as e:
-        print(f"Lỗi stop_runner: {str(e)}")
+        print(f"❌ Error stopping runner: {str(e)}")
         return {"success": False, "error": str(e)}
 
 @eel.expose
@@ -577,7 +650,6 @@ def get_runner_status():
     """Lấy trạng thái runner hiện tại"""
     global is_runner_active, runner_data, current_runner_instance
     
-    # Kiểm tra xem runner có đang chạy thực sự không
     actual_running = (
         is_runner_active and 
         current_runner_instance is not None and 
@@ -590,7 +662,115 @@ def get_runner_status():
         "account_count": len(runner_data.get('golike_accounts', [])) if runner_data else 0,
         "has_instance": current_runner_instance is not None
     }
+# Thêm vào file main Python (app.py hoặc tương tự)
 
+@eel.expose
+def update_checked_status_only(ig_ids_to_mark):
+    """
+    Chỉ update trạng thái checked mà KHÔNG gọi API GoLike
+    Tránh duplicate khi đánh dấu accounts đã chạy
+    
+    Args:
+        ig_ids_to_mark: List of Instagram IDs cần đánh dấu checked=True
+    """
+    try:
+        file_path = 'data/manager-golike.json'
+        
+        # Đọc file hiện tại
+        if not os.path.exists(file_path):
+            return {"success": False, "error": "File không tồn tại"}
+        
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        # Parse ig_ids nếu là string
+        if isinstance(ig_ids_to_mark, str):
+            ig_ids_to_mark = json.loads(ig_ids_to_mark)
+        
+        marked_count = 0
+        
+        # Chỉ update checked cho các IDs được chọn
+        for golike_acc in data:
+            if 'instagram_accounts' in golike_acc:
+                for ig_acc in golike_acc['instagram_accounts']:
+                    if ig_acc.get('id') in ig_ids_to_mark:
+                        ig_acc['checked'] = True
+                        marked_count += 1
+                        print(f"✓ Marked checked: {ig_acc.get('instagram_username', 'N/A')}")
+        
+        # Lưu file TRỰC TIẾP mà KHÔNG gọi API
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        
+        print(f"\n✅ Đã đánh dấu {marked_count} Instagram accounts là 'checked'\n")
+        
+        return {
+            "success": True,
+            "marked_count": marked_count
+        }
+        
+    except Exception as e:
+        print(f"❌ Error updating checked status: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+@eel.expose
+def reset_checked_status_all():
+    """
+    Reset tất cả checked = False mà KHÔNG gọi API
+    """
+    try:
+        file_path = 'data/manager-golike.json'
+        
+        if not os.path.exists(file_path):
+            return {"success": False, "error": "File không tồn tại"}
+        
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        reset_count = 0
+        
+        # Reset tất cả checked = False
+        for golike_acc in data:
+            if 'instagram_accounts' in golike_acc:
+                for ig_acc in golike_acc['instagram_accounts']:
+                    ig_acc['checked'] = False
+                    reset_count += 1
+        
+        # Lưu file TRỰC TIẾP
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        
+        print(f"✅ Đã reset {reset_count} Instagram accounts về 'unchecked'\n")
+        
+        return {
+            "success": True,
+            "reset_count": reset_count
+        }
+        
+    except Exception as e:
+        print(f"❌ Error resetting checked status: {str(e)}")
+        return {"success": False, "error": str(e)}
+
+
+@eel.expose
+def write_json_file_direct(file_path, data):
+    """
+    Lưu JSON trực tiếp mà KHÔNG gọi API - dùng cho việc sửa nhanh
+    """
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=4)
+        
+        print(f"✅ Saved directly to {file_path} without API call")
+        
+        return {"success": True}
+        
+    except Exception as e:
+        print(f"❌ Error saving JSON directly: {str(e)}")
+        return {"success": False, "error": str(e)}
 @eel.expose
 def main_check_key(key):
     with open(r'data/version_client.json', 'r', encoding="utf-8-sig") as f:
