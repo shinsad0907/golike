@@ -243,39 +243,24 @@ class InstagramManager {
             return;
         }
         
-        // Chỉ log thông tin cần thiết
-        console.log(`📌 GoLike Account: ${this.selectedGolikeAccount.username_account} (ID: ${this.selectedGolikeAccount.id_account})`);
-        console.log(`📌 Authorization: ${this.selectedGolikeAccount.authorization.substring(0, 50)}...`);
         console.log(`📌 Số lượng IG sẽ thêm: ${cookies.length}`);
-        console.log('─────────────────────────────────');
         
         // Tạo danh sách Instagram accounts mới
-        const newInstagramAccounts = [];
-        cookies.forEach((cookie, index) => {
-            const newInstagram = {
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9) + index,
-                id_account_golike: Math.floor(Math.random() * 900000) + 100000,
-                instagram_username: `IG_${Date.now()}_${index}`,
-                status: 'active',
-                created_at: new Date().toISOString(),
-                last_check: null,
-                cookie: cookie.trim(),
-                proxy: proxies[index].trim()
-            };
-            
-            // Log từng cặp cookie-proxy
-            console.log(`✅ IG #${index + 1}:`);
-            console.log(`   Cookie: ${cookie.trim().substring(0, 60)}...`);
-            console.log(`   Proxy: ${proxies[index].trim()}`);
-            
-            newInstagramAccounts.push(newInstagram);
-        });
+        const newInstagramAccounts = cookies.map((cookie, index) => ({
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9) + index,
+            id_account_golike: Math.floor(Math.random() * 900000) + 100000,
+            instagram_username: `IG_${Date.now()}_${index}`,
+            status: 'checking',
+            created_at: new Date().toISOString(),
+            last_check: null,
+            cookie: cookie.trim(),
+            proxy: proxies[index].trim()
+        }));
         
-        console.log('─────────────────────────────────');
-        console.log(`✅ Tổng cộng đã thêm: ${newInstagramAccounts.length} accounts`);
+        // Hiển thị modal progress
+        this.showProgressModal(newInstagramAccounts.length);
         
         try {
-            // CHỈ GỬI DATA CẦN THIẾT
             const dataToSave = {
                 golike_account_id: this.selectedGolikeAccount.id_account,
                 golike_username: this.selectedGolikeAccount.username_account,
@@ -283,19 +268,14 @@ class InstagramManager {
                 new_instagram_accounts: newInstagramAccounts
             };
             
-            console.log('📤 Sending to Python:', {
-                golike_account_id: dataToSave.golike_account_id,
-                golike_username: dataToSave.golike_username,
-                count: dataToSave.new_instagram_accounts.length
-            });
-            
             const saveResult = await eel.update_instagram_accounts(dataToSave)();
             
             if (saveResult.success) {
-                // Reload lại GoLike accounts sau khi lưu thành công
-                await this.loadGolikeAccounts();
+                // Hiển thị kết quả chi tiết
+                this.showResultsModal(saveResult);
                 
-                // Tìm lại selected account
+                // Reload data
+                await this.loadGolikeAccounts();
                 this.selectedGolikeAccount = this.golikeAccounts.find(
                     acc => acc.id_account === this.selectedGolikeAccount.id_account
                 );
@@ -303,16 +283,164 @@ class InstagramManager {
                 this.hideAddInstagramModal();
                 this.filterInstagramByGolike();
                 this.updateInstagramStats();
-                this.showNotification(`✅ Đã thêm ${newInstagramAccounts.length} tài khoản Instagram!`, 'success');
-                console.log('✅ Lưu file thành công!');
             } else {
                 throw new Error(saveResult.error);
             }
         } catch (error) {
             console.error('❌ Lỗi khi lưu:', error);
             this.showNotification('Lỗi khi lưu Instagram accounts!', 'error');
+        } finally {
+            this.hideProgressModal();
         }
     }
+    showResultsModal(saveResult) {
+        const modal = document.createElement('div');
+        modal.id = 'results-modal';
+        modal.className = 'modal';
+        
+        const successful = saveResult.successful || [];
+        const failed = saveResult.failed || [];
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #ddd;">
+                    <h3>
+                        <i class="fas fa-check-circle" style="color: #4CAF50;"></i>
+                        Kết quả xử lý Instagram Accounts
+                    </h3>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()" style="position: absolute; right: 20px; top: 20px;">×</button>
+                </div>
+                
+                <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
+                    <!-- Summary -->
+                    <div class="stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
+                        <div class="stat-card" style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold;">${saveResult.total}</div>
+                            <div style="color: #666;">Tổng cộng</div>
+                        </div>
+                        <div class="stat-card" style="background: #e8f5e9; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">${saveResult.successful_count}</div>
+                            <div style="color: #666;">Thành công</div>
+                        </div>
+                        <div class="stat-card" style="background: #ffebee; padding: 15px; border-radius: 8px; text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold; color: #f44336;">${saveResult.failed_count}</div>
+                            <div style="color: #666;">Thất bại</div>
+                        </div>
+                    </div>
+
+                    <!-- Successful Accounts -->
+                    ${successful.length > 0 ? `
+                        <div class="success-section" style="margin-bottom: 20px;">
+                            <h4 style="color: #4CAF50; margin-bottom: 10px;">
+                                <i class="fas fa-check-circle"></i> Thành công (${successful.length})
+                            </h4>
+                            <div style="max-height: 200px; overflow-y: auto;">
+                                ${successful.map((acc, idx) => `
+                                    <div style="background: #f9f9f9; padding: 10px; margin-bottom: 5px; border-radius: 5px; border-left: 3px solid #4CAF50;">
+                                        <div style="font-weight: bold;">${idx + 1}. ${acc.username}</div>
+                                        <div style="font-size: 12px; color: #666;">${acc.message} | Proxy: ${acc.proxy}</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Failed Accounts -->
+                    ${failed.length > 0 ? `
+                        <div class="error-section">
+                            <h4 style="color: #f44336; margin-bottom: 10px;">
+                                <i class="fas fa-exclamation-circle"></i> Thất bại (${failed.length})
+                            </h4>
+                            <div style="max-height: 300px; overflow-y: auto;">
+                                ${failed.map((acc, idx) => `
+                                    <div style="background: #fff3f3; padding: 12px; margin-bottom: 8px; border-radius: 5px; border-left: 3px solid #f44336;">
+                                        <div style="font-weight: bold; color: #f44336;">
+                                            ${idx + 1}. ${acc.username || 'N/A'}
+                                            <span style="float: right; background: #f44336; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">
+                                                ${acc.status.toUpperCase()}
+                                            </span>
+                                        </div>
+                                        <div style="font-size: 13px; color: #d32f2f; margin-top: 5px;">
+                                            <i class="fas fa-exclamation-triangle"></i> ${acc.message}
+                                        </div>
+                                        <div style="font-size: 11px; color: #666; margin-top: 5px; word-break: break-all;">
+                                            Cookie: ${acc.cookie || 'N/A'}
+                                        </div>
+                                        <div style="font-size: 11px; color: #666;">
+                                            Proxy: ${acc.proxy || 'N/A'}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+                
+                <div class="modal-footer" style="padding: 15px; border-top: 1px solid #ddd; text-align: right;">
+                    <button class="btn btn-primary" onclick="this.closest('.modal').remove()">
+                        <i class="fas fa-check"></i> Đóng
+                    </button>
+                    ${failed.length > 0 ? `
+                        <button class="btn btn-outline" onclick="window.instagramManager.exportFailedAccounts(${JSON.stringify(failed).replace(/"/g, '&quot;')})">
+                            <i class="fas fa-download"></i> Export lỗi
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+    }
+    exportFailedAccounts(failed) {
+        let content = '=== INSTAGRAM ACCOUNTS LỖI ===\n\n';
+        
+        failed.forEach((acc, idx) => {
+            content += `${idx + 1}. Username: ${acc.username || 'N/A'}\n`;
+            content += `   Status: ${acc.status}\n`;
+            content += `   Lỗi: ${acc.message}\n`;
+            content += `   Cookie: ${acc.cookie}\n`;
+            content += `   Proxy: ${acc.proxy}\n`;
+            content += `\n`;
+        });
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `instagram_errors_${Date.now()}.txt`;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        this.showNotification('✅ Đã export danh sách lỗi', 'success');
+    }
+    hideProgressModal() {
+        const modal = document.getElementById('progress-modal');
+        if (modal) {
+            modal.remove();
+        }
+    }
+    showProgressModal(total) {
+        const modal = document.createElement('div');
+        modal.id = 'progress-modal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <h3><i class="fas fa-spinner fa-spin"></i> Đang xử lý...</h3>
+                <div class="progress-container">
+                    <div id="progress-bar" style="width: 0%; height: 30px; background: linear-gradient(90deg, #4CAF50, #8BC34A); border-radius: 5px; transition: width 0.3s;"></div>
+                </div>
+                <div id="progress-text" style="margin-top: 10px; text-align: center;">
+                    0 / ${total}
+                </div>
+                <div id="progress-details" style="margin-top: 20px; max-height: 200px; overflow-y: auto; font-size: 12px;">
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+    }
+    
 
     setupContextMenu() {
         const contextMenu = document.getElementById('instagram-context-menu');
@@ -550,6 +678,8 @@ class InstagramManager {
         }
     }
 
+    
+
     filterInstagramByGolike() {
         if (!this.selectedGolikeAccount) {
             this.updateInstagramTable([]);
@@ -680,7 +810,32 @@ class InstagramManager {
         }, 3000);
     }
 }
-
+eel.expose(update_instagram_check_progress);
+function update_instagram_check_progress(result) {
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressDetails = document.getElementById('progress-details');
+    
+    if (!progressBar) return;
+    
+    const currentCount = parseInt(progressBar.dataset.current || '0') + 1;
+    const total = parseInt(progressBar.dataset.total || '100');
+    
+    progressBar.dataset.current = currentCount;
+    progressBar.style.width = `${(currentCount / total) * 100}%`;
+    progressText.textContent = `${currentCount} / ${total}`;
+    
+    // Thêm chi tiết
+    const statusIcon = result.success ? '✅' : '❌';
+    const statusClass = result.success ? 'text-success' : 'text-error';
+    const detail = document.createElement('div');
+    detail.className = statusClass;
+    detail.innerHTML = `${statusIcon} ${result.username || 'N/A'}: ${result.message}`;
+    progressDetails.insertBefore(detail, progressDetails.firstChild);
+    
+    // Auto scroll
+    progressDetails.scrollTop = 0;
+}
 // Khởi tạo khi DOM loaded
 document.addEventListener('DOMContentLoaded', () => {
     console.log('Initializing Instagram Manager...');

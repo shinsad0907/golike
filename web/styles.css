@@ -1948,3 +1948,120 @@ button:focus,
     opacity: 0.5;
     cursor: not-allowed;
 }
+/* Progress Modal */
+#progress-modal .modal-content {
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.progress-container {
+    background: #f0f0f0;
+    border-radius: 10px;
+    padding: 5px;
+    margin: 20px 0;
+}
+
+#progress-details {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+}
+
+#progress-details .text-success {
+    color: #4CAF50;
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+#progress-details .text-error {
+    color: #f44336;
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Results Modal */
+#results-modal .modal-content {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.stat-card {
+    transition: transform 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.success-section h4,
+.error-section h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Scrollbar styling */
+.modal-body::-webkit-scrollbar,
+#progress-details::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track,
+#progress-details::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb,
+#progress-details::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover,
+#progress-details::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Animation cho error items */
+.error-section > div > div {
+    animation: slideInLeft 0.3s ease;
+}
+
+@keyframes slideInLeft {
+    from {
+        transform: translateX(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    #results-modal .modal-content {
+        max-width: 95% !important;
+    }
+}

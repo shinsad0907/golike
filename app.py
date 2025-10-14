@@ -337,26 +337,66 @@ def add_proxy_instagram_account(file_path, data):
 @eel.expose
 def update_instagram_accounts(data):
     """
-    Thêm bulk Instagram accounts
+    Thêm bulk Instagram accounts và trả về chi tiết kết quả
     """
     try:
         # Khởi tạo InstagramManager và check accounts
         instagram_manager = InstagramManager(data)
         results = instagram_manager.thread_check_account()
         
-        # Trả về kết quả để frontend hiển thị
+        # Phân loại kết quả
+        successful = [r for r in results if r['success']]
+        failed = [r for r in results if not r['success']]
+        
+        print(f"\n{'='*60}")
+        print(f"📊 INSTAGRAM ACCOUNTS CHECK RESULTS")
+        print(f"{'='*60}")
+        print(f"✅ Thành công: {len(successful)}")
+        print(f"❌ Thất bại: {len(failed)}")
+        print(f"{'='*60}\n")
+        
+        # Log chi tiết các lỗi
+        if failed:
+            print("❌ CHI TIẾT CÁC TÀI KHOẢN LỖI:")
+            print("-" * 60)
+            for idx, err in enumerate(failed, 1):
+                print(f"\n{idx}. Username: {err.get('username', 'N/A')}")
+                print(f"   Status: {err.get('status')}")
+                print(f"   Lỗi: {err.get('message')}")
+                print(f"   Cookie: {err.get('cookie', 'N/A')[:50]}...")
+                print(f"   Proxy: {err.get('proxy', 'N/A')}")
+        
+        # Trả về kết quả đầy đủ cho frontend
         return {
             "success": True,
-            "message": "Đã thêm Instagram accounts thành công",
-            "count": len(results)
+            "message": f"Đã xử lý {len(results)} accounts",
+            "total": len(results),
+            "successful_count": len(successful),
+            "failed_count": len(failed),
+            "successful": successful,
+            "failed": failed,
+            "results": results  # Trả về toàn bộ kết quả
         }
         
     except Exception as e:
+        print(f"❌ Error in update_instagram_accounts: {str(e)}")
         return {
             "success": False, 
-            "error": str(e)
+            "error": str(e),
+            "total": 0,
+            "successful_count": 0,
+            "failed_count": 0,
+            "results": []
         }
-
+# Thêm hàm callback để update progress realtime
+@eel.expose
+def update_instagram_check_progress(result):
+    """Callback được gọi từ Python khi check từng account"""
+    try:
+        # Frontend sẽ lắng nghe qua eel.update_instagram_check_progress()
+        return {"success": True}
+    except:
+        return {"success": False}
 @eel.expose  
 def update_accounts_from_api(file_path, data):
     try:
