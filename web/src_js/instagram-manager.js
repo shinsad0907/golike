@@ -245,14 +245,8 @@ class InstagramManager {
         
         console.log(`📌 Số lượng IG sẽ thêm: ${cookies.length}`);
         
-        // Tạo danh sách Instagram accounts mới
+        // Đơn giản hóa: chỉ gửi cookie + proxy
         const newInstagramAccounts = cookies.map((cookie, index) => ({
-            id: Date.now().toString() + Math.random().toString(36).substr(2, 9) + index,
-            id_account_golike: Math.floor(Math.random() * 900000) + 100000,
-            instagram_username: `IG_${Date.now()}_${index}`,
-            status: 'checking',
-            created_at: new Date().toISOString(),
-            last_check: null,
             cookie: cookie.trim(),
             proxy: proxies[index].trim()
         }));
@@ -268,10 +262,27 @@ class InstagramManager {
                 new_instagram_accounts: newInstagramAccounts
             };
             
-            const saveResult = await eel.update_instagram_accounts(dataToSave)();
+            console.log('📤 Sending to Python:', {
+                golike_id: dataToSave.golike_account_id,
+                total: newInstagramAccounts.length
+            });
+            
+            // FIX: Gọi hàm Python với timeout
+            const saveResult = await Promise.race([
+                eel.process_instagram_accounts(dataToSave)(),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Timeout sau 5 phút')), 300000)
+                )
+            ]);
+            
+            console.log('📥 Response:', saveResult);
+            
+            // FIX: Validate response
+            if (!saveResult || typeof saveResult !== 'object') {
+                throw new Error('Response không hợp lệ từ Python');
+            }
             
             if (saveResult.success) {
-                // Hiển thị kết quả chi tiết
                 this.showResultsModal(saveResult);
                 
                 // Reload data
@@ -283,23 +294,79 @@ class InstagramManager {
                 this.hideAddInstagramModal();
                 this.filterInstagramByGolike();
                 this.updateInstagramStats();
+                
+                console.log('✅ Hoàn thành');
             } else {
-                throw new Error(saveResult.error);
+                throw new Error(saveResult.error || 'Lỗi không xác định');
             }
         } catch (error) {
-            console.error('❌ Lỗi khi lưu:', error);
-            this.showNotification('Lỗi khi lưu Instagram accounts!', 'error');
+            console.error('❌ Lỗi:', error);
+            this.showNotification(`Lỗi: ${error.message}`, 'error');
+            this.showErrorModal(error);
         } finally {
             this.hideProgressModal();
         }
     }
+
+    
+    showErrorModal(error) {
+        const modal = document.createElement('div');
+        modal.id = 'error-modal';
+        modal.className = 'modal';
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header" style="padding: 20px; border-bottom: 1px solid #ddd; background: #ffebee;">
+                    <h3 style="color: #f44336;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Lỗi xử lý
+                    </h3>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()" style="position: absolute; right: 20px; top: 20px;">×</button>
+                </div>
+                
+                <div class="modal-body" style="padding: 20px;">
+                    <div style="background: #fff3f3; padding: 15px; border-radius: 8px; border-left: 4px solid #f44336;">
+                        <div style="font-weight: bold; margin-bottom: 10px;">Chi tiết lỗi:</div>
+                        <div style="font-family: monospace; font-size: 13px; color: #d32f2f;">
+                            ${error.message || 'Unknown error'}
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+                        <div style="font-size: 13px; color: #666;">
+                            <strong>Gợi ý khắc phục:</strong><br>
+                            • Kiểm tra kết nối mạng<br>
+                            • Đảm bảo GoLike authorization còn hiệu lực<br>
+                            • Thử giảm số lượng accounts (1-5 accounts/lần)<br>
+                            • Kiểm tra proxy có hoạt động không<br>
+                            • Xem console log để biết thêm chi tiết
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer" style="padding: 15px; border-top: 1px solid #ddd; text-align: right;">
+                    <button class="btn btn-primary" onclick="this.closest('.modal').remove()">
+                        <i class="fas fa-times"></i> Đóng
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        modal.style.display = 'flex';
+    }
+
     showResultsModal(saveResult) {
         const modal = document.createElement('div');
         modal.id = 'results-modal';
         modal.className = 'modal';
         
-        const successful = saveResult.successful || [];
-        const failed = saveResult.failed || [];
+        // FIX: Đảm bảo có default values
+        const successful = saveResult?.successful || [];
+        const failed = saveResult?.failed || [];
+        const total = saveResult?.total || 0;
+        const successCount = saveResult?.successful_count || successful.length;
+        const failedCount = saveResult?.failed_count || failed.length;
         
         modal.innerHTML = `
             <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
@@ -312,23 +379,21 @@ class InstagramManager {
                 </div>
                 
                 <div class="modal-body" style="padding: 20px; overflow-y: auto; flex: 1;">
-                    <!-- Summary -->
                     <div class="stats-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px;">
                         <div class="stat-card" style="background: #f5f5f5; padding: 15px; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 24px; font-weight: bold;">${saveResult.total}</div>
+                            <div style="font-size: 24px; font-weight: bold;">${total}</div>
                             <div style="color: #666;">Tổng cộng</div>
                         </div>
                         <div class="stat-card" style="background: #e8f5e9; padding: 15px; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">${saveResult.successful_count}</div>
+                            <div style="font-size: 24px; font-weight: bold; color: #4CAF50;">${successCount}</div>
                             <div style="color: #666;">Thành công</div>
                         </div>
                         <div class="stat-card" style="background: #ffebee; padding: 15px; border-radius: 8px; text-align: center;">
-                            <div style="font-size: 24px; font-weight: bold; color: #f44336;">${saveResult.failed_count}</div>
+                            <div style="font-size: 24px; font-weight: bold; color: #f44336;">${failedCount}</div>
                             <div style="color: #666;">Thất bại</div>
                         </div>
                     </div>
 
-                    <!-- Successful Accounts -->
                     ${successful.length > 0 ? `
                         <div class="success-section" style="margin-bottom: 20px;">
                             <h4 style="color: #4CAF50; margin-bottom: 10px;">
@@ -337,15 +402,14 @@ class InstagramManager {
                             <div style="max-height: 200px; overflow-y: auto;">
                                 ${successful.map((acc, idx) => `
                                     <div style="background: #f9f9f9; padding: 10px; margin-bottom: 5px; border-radius: 5px; border-left: 3px solid #4CAF50;">
-                                        <div style="font-weight: bold;">${idx + 1}. ${acc.username}</div>
-                                        <div style="font-size: 12px; color: #666;">${acc.message} | Proxy: ${acc.proxy}</div>
+                                        <div style="font-weight: bold;">${idx + 1}. ${acc.username || 'N/A'}</div>
+                                        <div style="font-size: 12px; color: #666;">${acc.message || 'OK'} | Proxy: ${acc.proxy || 'N/A'}</div>
                                     </div>
                                 `).join('')}
                             </div>
                         </div>
                     ` : ''}
 
-                    <!-- Failed Accounts -->
                     ${failed.length > 0 ? `
                         <div class="error-section">
                             <h4 style="color: #f44336; margin-bottom: 10px;">
@@ -357,14 +421,14 @@ class InstagramManager {
                                         <div style="font-weight: bold; color: #f44336;">
                                             ${idx + 1}. ${acc.username || 'N/A'}
                                             <span style="float: right; background: #f44336; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">
-                                                ${acc.status.toUpperCase()}
+                                                ${(acc.status || 'error').toUpperCase()}
                                             </span>
                                         </div>
                                         <div style="font-size: 13px; color: #d32f2f; margin-top: 5px;">
-                                            <i class="fas fa-exclamation-triangle"></i> ${acc.message}
+                                            <i class="fas fa-exclamation-triangle"></i> ${acc.message || 'Unknown error'}
                                         </div>
                                         <div style="font-size: 11px; color: #666; margin-top: 5px; word-break: break-all;">
-                                            Cookie: ${acc.cookie || 'N/A'}
+                                            Cookie: ${(acc.cookie || 'N/A').substring(0, 50)}...
                                         </div>
                                         <div style="font-size: 11px; color: #666;">
                                             Proxy: ${acc.proxy || 'N/A'}
@@ -372,6 +436,13 @@ class InstagramManager {
                                     </div>
                                 `).join('')}
                             </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${successful.length === 0 && failed.length === 0 ? `
+                        <div style="text-align: center; padding: 40px; color: #999;">
+                            <i class="fas fa-info-circle" style="font-size: 48px; margin-bottom: 15px;"></i>
+                            <div>Không có dữ liệu để hiển thị</div>
                         </div>
                     ` : ''}
                 </div>
@@ -397,7 +468,10 @@ class InstagramManager {
         document.body.appendChild(modal);
         modal.style.display = 'flex';
     }
-    
+
+// ==================== PATCH 5: Fix update_instagram_check_progress ====================
+// Thay thế hàm update_instagram_check_progress ở cuối file:
+
     // Và thêm hàm exportAccounts này vào class InstagramManager:
     exportAccounts(accounts, type) {
         console.log(`📥 Export ${type} accounts:`, accounts);
@@ -446,20 +520,25 @@ class InstagramManager {
         modal.innerHTML = `
             <div class="modal-content" style="max-width: 500px;">
                 <h3><i class="fas fa-spinner fa-spin"></i> Đang xử lý...</h3>
-                <div class="progress-container">
-                    <div id="progress-bar" style="width: 0%; height: 30px; background: linear-gradient(90deg, #4CAF50, #8BC34A); border-radius: 5px; transition: width 0.3s;"></div>
+                <div class="progress-container" style="background: #f0f0f0; border-radius: 10px; overflow: hidden;">
+                    <div id="progress-bar" 
+                        style="width: 0%; height: 30px; background: linear-gradient(90deg, #4CAF50, #8BC34A); border-radius: 5px; transition: width 0.3s;"
+                        data-current="0" 
+                        data-total="${total}">
+                    </div>
                 </div>
-                <div id="progress-text" style="margin-top: 10px; text-align: center;">
+                <div id="progress-text" style="margin-top: 10px; text-align: center; font-weight: bold;">
                     0 / ${total}
                 </div>
-                <div id="progress-details" style="margin-top: 20px; max-height: 200px; overflow-y: auto; font-size: 12px;">
+                <div id="progress-details" style="margin-top: 20px; max-height: 200px; overflow-y: auto; font-size: 12px; padding: 10px; background: #f9f9f9; border-radius: 5px;">
+                    <div style="color: #666; font-style: italic;">Đang bắt đầu...</div>
                 </div>
             </div>
         `;
         document.body.appendChild(modal);
         modal.style.display = 'flex';
     }
-    
+
 
     setupContextMenu() {
         const contextMenu = document.getElementById('instagram-context-menu');
@@ -831,29 +910,45 @@ class InstagramManager {
 }
 eel.expose(update_instagram_check_progress);
 function update_instagram_check_progress(result) {
+    console.log('📊 Progress update:', result);
+    
     const progressBar = document.getElementById('progress-bar');
     const progressText = document.getElementById('progress-text');
     const progressDetails = document.getElementById('progress-details');
     
-    if (!progressBar) return;
+    if (!progressBar || !progressText || !progressDetails) {
+        console.warn('Progress elements not found');
+        return;
+    }
     
-    const currentCount = parseInt(progressBar.dataset.current || '0') + 1;
-    const total = parseInt(progressBar.dataset.total || '100');
-    
-    progressBar.dataset.current = currentCount;
-    progressBar.style.width = `${(currentCount / total) * 100}%`;
-    progressText.textContent = `${currentCount} / ${total}`;
-    
-    // Thêm chi tiết
-    const statusIcon = result.success ? '✅' : '❌';
-    const statusClass = result.success ? 'text-success' : 'text-error';
-    const detail = document.createElement('div');
-    detail.className = statusClass;
-    detail.innerHTML = `${statusIcon} ${result.username || 'N/A'}: ${result.message}`;
-    progressDetails.insertBefore(detail, progressDetails.firstChild);
-    
-    // Auto scroll
-    progressDetails.scrollTop = 0;
+    try {
+        const currentCount = parseInt(progressBar.dataset.current || '0') + 1;
+        const total = parseInt(progressBar.dataset.total || '100');
+        
+        progressBar.dataset.current = currentCount;
+        progressBar.style.width = `${(currentCount / total) * 100}%`;
+        progressText.textContent = `${currentCount} / ${total}`;
+        
+        // Thêm chi tiết
+        const statusIcon = result.success ? '✅' : '❌';
+        const statusClass = result.success ? 'text-success' : 'text-error';
+        const statusColor = result.success ? '#4CAF50' : '#f44336';
+        
+        const detail = document.createElement('div');
+        detail.style.cssText = `color: ${statusColor}; margin: 5px 0; padding: 5px; background: ${result.success ? '#e8f5e9' : '#ffebee'}; border-radius: 3px;`;
+        detail.innerHTML = `${statusIcon} <strong>${result.username || 'N/A'}</strong>: ${result.message || 'Processing...'}`;
+        
+        progressDetails.insertBefore(detail, progressDetails.firstChild);
+        
+        // Keep only last 10 items
+        while (progressDetails.children.length > 10) {
+            progressDetails.removeChild(progressDetails.lastChild);
+        }
+        
+        progressDetails.scrollTop = 0;
+    } catch (error) {
+        console.error('Error updating progress:', error);
+    }
 }
 // Khởi tạo khi DOM loaded
 document.addEventListener('DOMContentLoaded', () => {

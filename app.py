@@ -456,6 +456,95 @@ def update_instagram_check_progress(result):
         return {"success": True}
     except:
         return {"success": False}
+    
+@eel.expose
+def process_instagram_accounts(data):
+    """
+    MAIN FUNCTION - Xử lý bulk Instagram accounts với progress realtime
+    Được gọi từ JS: eel.process_instagram_accounts(dataToSave)()
+    """
+    try:
+        print(f"\n{'='*60}")
+        print(f"🚀 PROCESS INSTAGRAM ACCOUNTS")
+        print(f"{'='*60}")
+        print(f"📥 GoLike ID: {data.get('golike_account_id')}")
+        print(f"📥 GoLike Username: {data.get('golike_username')}")
+        print(f"📥 Total new accounts: {len(data.get('new_instagram_accounts', []))}")
+        print(f"{'='*60}\n")
+        
+        # Validate input
+        if not data.get('golike_account_id') or not data.get('golike_authorization'):
+            return {
+                "success": False,
+                "error": "Thiếu thông tin GoLike account",
+                "total": 0,
+                "successful_count": 0,
+                "failed_count": 0,
+                "successful": [],
+                "failed": []
+            }
+        
+        new_accounts = data.get('new_instagram_accounts', [])
+        if not new_accounts:
+            return {
+                "success": False,
+                "error": "Không có Instagram accounts để xử lý",
+                "total": 0,
+                "successful_count": 0,
+                "failed_count": 0,
+                "successful": [],
+                "failed": []
+            }
+        
+        # Khởi tạo InstagramManager
+        instagram_manager = InstagramManager(data)
+        
+        # Check accounts với progress callback
+        results = instagram_manager.thread_check_account()
+        
+        # Phân loại kết quả
+        successful = [r for r in results if r.get('success')]
+        failed = [r for r in results if not r.get('success')]
+        
+        print(f"\n{'='*60}")
+        print(f"📊 RESULTS SUMMARY")
+        print(f"{'='*60}")
+        print(f"✅ Successful: {len(successful)}")
+        print(f"❌ Failed: {len(failed)}")
+        print(f"📊 Total: {len(results)}")
+        print(f"{'='*60}\n")
+        
+        # Log chi tiết failed accounts
+        if failed:
+            print("❌ FAILED ACCOUNTS DETAIL:")
+            for idx, acc in enumerate(failed, 1):
+                print(f"   {idx}. {acc.get('username', 'N/A')}: {acc.get('message')}")
+            print()
+        
+        return {
+            "success": True,
+            "message": f"Đã xử lý {len(results)} accounts",
+            "total": len(results),
+            "successful_count": len(successful),
+            "failed_count": len(failed),
+            "successful": successful,
+            "failed": failed
+        }
+        
+    except Exception as e:
+        print(f"❌ ERROR in process_instagram_accounts: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        return {
+            "success": False,
+            "error": str(e),
+            "total": 0,
+            "successful_count": 0,
+            "failed_count": 0,
+            "successful": [],
+            "failed": []
+        }
 @eel.expose  
 def update_accounts_from_api(file_path, data):
     try:

@@ -9,14 +9,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
 # ❌ KHÔNG redirect stdout/stderr - sẽ làm hỏng Eel!
 # Chỉ cần bảo vệ flush() method trong hàm log()
-try:
-    json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../data/manager-golike.json'))
-except:
-    try:
-        json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
-    except:
-        json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/manager-golike.json'))
-# json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
+# try:
+#     json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../data/manager-golike.json'))
+# except:
+#     try:
+#         json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
+#     except:
+#         json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/manager-golike.json'))
+json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
 
 class InstagramManager:
     def __init__(self, account):
@@ -101,7 +101,7 @@ class InstagramManager:
             return None
 
     def follow_account(self, proxy):
-        """Follow account để verify"""
+        """Follow account để verify - LUÔN RETURN DICT"""
         session = requests.Session()
         proxies = self.setup_proxy(proxy)
         
@@ -109,10 +109,10 @@ class InstagramManager:
             self.log(f"[FOLLOW] Bắt đầu follow account...")
             
             response = session.get(self.link_verify_follow, 
-                                 headers=self.headers, 
-                                 timeout=15, 
-                                 proxies=proxies,
-                                 impersonate='chrome110')
+                                headers=self.headers, 
+                                timeout=15, 
+                                proxies=proxies,
+                                impersonate='chrome110')
             text = response.text
             
             jazoest = text.split('jazoest=')[1].split('"')[0]
@@ -134,41 +134,44 @@ class InstagramManager:
             }
             
             response = session.post('https://www.instagram.com/graphql/query', 
-                                  headers=headers_copy, 
-                                  data=data, 
-                                  timeout=15, 
-                                  proxies=proxies,
-                                  impersonate='chrome110')
+                                headers=headers_copy, 
+                                data=data, 
+                                timeout=15, 
+                                proxies=proxies,
+                                impersonate='chrome110')
             
             result = response.json()
             self.log(f"[FOLLOW] Result: {result}")
             sleep(5)
-            return result
+            return result if result else {'status': 'error', 'message': 'Empty response'}
             
         except Exception as e:
             self.log(f"[FOLLOW] ERROR: {str(e)}")
-            return {'status': 'error'}
+            return {'status': 'error', 'message': str(e)}
+
 
     def add_account_golike(self, username):
-        """Thêm account vào GoLike"""
+        """Thêm account vào GoLike - LUÔN RETURN DICT"""
         json_data = {'object_id': username}
         
         try:
             self.log(f"[GOLIKE] Thêm account: {username}")
             
             response = requests.post('https://gateway.golike.net/api/instagram-account/verify-account', 
-                                   headers=self.headers_golike, 
-                                   json=json_data,
-                                   timeout=15,
-                                   impersonate='chrome110')
+                                headers=self.headers_golike, 
+                                json=json_data,
+                                timeout=15,
+                                impersonate='chrome110')
             
             result = response.json()
             self.log(f"[GOLIKE] Response: {result}")
-            return result
+            return result if result else {'status': 'error', 'message': 'Empty response'}
             
         except Exception as e:
             self.log(f"[GOLIKE] ERROR: {str(e)}")
-            return {'status': 'error'}
+            return {'status': 'error', 'message': str(e)}
+
+   
 
     def check_account_golike(self, username):
         """Check account đã tồn tại trên GoLike chưa"""
@@ -196,7 +199,9 @@ class InstagramManager:
             return False, None
 
     def update_cookie(self, username, cookie, proxy, id_golike):
-        """Cập nhật hoặc thêm mới Instagram account vào file"""
+        """
+        Cập nhật hoặc thêm mới Instagram account - TRÁNH DUPLICATE
+        """
         golike_id = self.account['golike_account_id']
         
         self.log(f"[UPDATE] Username: {username}, GoLike ID: {id_golike}")
@@ -206,36 +211,48 @@ class InstagramManager:
                 if 'instagram_accounts' not in data_manager:
                     data_manager['instagram_accounts'] = []
                 
-                # Check xem username đã tồn tại chưa
+                # ✅ CHECK DUPLICATE - Tìm theo ID GoLike hoặc username
                 found = False
                 for ig_acc in data_manager['instagram_accounts']:
-                    if ig_acc['instagram_username'] == username:
-                        # Update
+                    # Kiểm tra theo id_account_golike HOẶC username
+                    if (ig_acc.get('id_account_golike') == id_golike or 
+                        ig_acc.get('instagram_username', '').lower() == username.lower()):
+                        
+                        # UPDATE - không tạo mới
+                        ig_acc['id_account_golike'] = id_golike  # Đảm bảo ID đúng
+                        ig_acc['instagram_username'] = username
                         ig_acc['cookie'] = cookie
                         ig_acc['proxy'] = proxy
                         ig_acc['last_check'] = datetime.now().isoformat()
                         ig_acc['status'] = 'active'
                         found = True
-                        self.log(f"[UPDATE] ✅ Đã cập nhật: {username}")
+                        self.log(f"[UPDATE] ✅ UPDATED existing: {username}")
                         break
                 
-                # Nếu chưa có thì thêm mới
+                # Nếu chưa có thì mới thêm
                 if not found:
-                    data_manager['instagram_accounts'].append({
-                        'id': f"{int(time.time())}_{len(data_manager['instagram_accounts'])}",
+                    new_account = {
+                        'id': f"ig_{int(time.time() * 1000)}_{id_golike}",  # Unique ID
                         'id_account_golike': id_golike,
                         'instagram_username': username,
                         'status': 'active',
                         'created_at': datetime.now().isoformat(),
                         'last_check': datetime.now().isoformat(),
                         'cookie': cookie,
-                        'proxy': proxy
-                    })
-                    self.log(f"[UPDATE] ✅ Đã thêm mới: {username}")
+                        'proxy': proxy,
+                        'checked': False  # Mặc định chưa check
+                    }
+                    data_manager['instagram_accounts'].append(new_account)
+                    self.log(f"[UPDATE] ✅ ADDED new: {username}")
                 
-                # Lưu file
-                with open(json_path, 'w', encoding='utf-8') as f:
-                    json.dump(self.data_manager_golike, f, ensure_ascii=False, indent=4)
+                # Lưu file ngay lập tức
+                try:
+                    with open(json_path, 'w', encoding='utf-8') as f:
+                        json.dump(self.data_manager_golike, f, ensure_ascii=False, indent=4)
+                    self.log(f"[UPDATE] 💾 Saved to file")
+                except Exception as e:
+                    self.log(f"[UPDATE] ❌ Error saving file: {str(e)}")
+                    return False
                 
                 return True
         
@@ -243,34 +260,55 @@ class InstagramManager:
         return False
 
     def check_user(self, account_data):
-        """Check 1 Instagram account"""
+        """Check 1 Instagram account - LUÔN RETURN DICT"""
         session = requests.Session()
         
+        # Default error result
+        default_error = {
+            'success': False,
+            'status': 'error',
+            'message': 'Unknown error',
+            'username': None,
+            'cookie': '',
+            'proxy': ''
+        }
+        
         try:
+            # Validate input
+            if not account_data or not isinstance(account_data, dict):
+                self.log("[CHECK USER] ❌ Invalid account_data!")
+                return {
+                    **default_error,
+                    'message': 'Dữ liệu account không hợp lệ'
+                }
+            
             cookie = account_data.get('cookie', '').strip()
             proxy = account_data.get('proxy', '').strip()
             
             self.log(f"\n{'='*60}")
             self.log(f"[CHECK USER] Bắt đầu check account")
-            self.log(f"[CHECK USER] Cookie: {cookie[:50]}...")
+            self.log(f"[CHECK USER] Cookie: {cookie[:50]}..." if cookie else "[CHECK USER] Cookie: EMPTY")
             self.log(f"[CHECK USER] Proxy: {proxy}")
             self.log(f"{'='*60}")
             
             if not cookie:
                 self.log("[CHECK USER] ❌ Cookie rỗng!")
                 return {
-                    'success': False,
-                    'status': 'error',
+                    **default_error,
                     'message': 'Cookie rỗng',
-                    'username': None,
-                    'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
                     'proxy': proxy
                 }
             
             proxies = self.setup_proxy(proxy)
             
             self.headers['cookie'] = cookie
-            self.headers['x-csrftoken'] = cookie.split('csrftoken=')[1].split(';')[0]
+            
+            # Extract csrftoken safely
+            try:
+                if 'csrftoken=' in cookie:
+                    self.headers['x-csrftoken'] = cookie.split('csrftoken=')[1].split(';')[0]
+            except:
+                self.log("[CHECK USER] ⚠️ Không tìm thấy csrftoken")
             
             self.log("[CHECK USER] Đang request Instagram...")
             
@@ -285,10 +323,8 @@ class InstagramManager:
             if response.status_code != 200:
                 self.log(f"[CHECK USER] ❌ HTTP Error {response.status_code}")
                 return {
-                    'success': False,
-                    'status': 'error',
+                    **default_error,
                     'message': f'HTTP {response.status_code}',
-                    'username': None,
                     'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
                     'proxy': proxy
                 }
@@ -298,10 +334,9 @@ class InstagramManager:
             if '"username":"' not in text:
                 self.log("[CHECK USER] ❌ Cookie DIE hoặc cần challenge!")
                 return {
-                    'success': False,
+                    **default_error,
                     'status': 'die',
                     'message': 'Cookie die hoặc cần challenge',
-                    'username': None,
                     'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
                     'proxy': proxy
                 }
@@ -311,7 +346,10 @@ class InstagramManager:
             
             # Check trên GoLike
             exists, id_golike = self.check_account_golike(username)
-            for i in range(3):
+            
+            # Retry logic
+            max_retries = 3
+            for attempt in range(max_retries):
                 if exists:
                     # Update cookie
                     self.update_cookie(username, cookie, proxy, id_golike)
@@ -326,51 +364,73 @@ class InstagramManager:
                     }
                 else:
                     # Follow và thêm mới
-                    self.log(f"[CHECK USER] Cần follow và thêm mới...")
+                    self.log(f"[CHECK USER] Attempt {attempt + 1}/{max_retries}: Follow và thêm mới...")
                     follow_result = self.follow_account(proxy)
                     
                     if follow_result.get('status') == 'error':
-                        self.log(f"[CHECK USER] ❌ Lỗi follow!")
-                        return {
-                            'success': False,
-                            'status': 'error',
-                            'message': 'Lỗi follow account',
-                            'username': username,
-                            'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
-                            'proxy': proxy
-                        }
+                        self.log(f"[CHECK USER] ❌ Lỗi follow (attempt {attempt + 1})!")
+                        if attempt < max_retries - 1:
+                            time.sleep(2)
+                            continue
+                        else:
+                            return {
+                                **default_error,
+                                'message': 'Lỗi follow account sau 3 lần thử',
+                                'username': username,
+                                'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
+                                'proxy': proxy
+                            }
                     
                     time.sleep(1)
                     
                     result = self.add_account_golike(username)
                     if result.get('status') == 200:
                         id_golike = result.get('data', {}).get('id')
-                        self.update_cookie(username, cookie, proxy, id_golike)
-                        self.log(f"[CHECK USER] ✅ HOÀN THÀNH - Added: {username}")
-                        return {
-                            'success': True,
-                            'status': 'added',
-                            'message': 'Đã thêm mới',
-                            'username': username,
-                            'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
-                            'proxy': proxy
-                        }
+                        if id_golike:
+                            self.update_cookie(username, cookie, proxy, id_golike)
+                            self.log(f"[CHECK USER] ✅ HOÀN THÀNH - Added: {username}")
+                            return {
+                                'success': True,
+                                'status': 'added',
+                                'message': 'Đã thêm mới',
+                                'username': username,
+                                'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
+                                'proxy': proxy
+                            }
+                        else:
+                            self.log(f"[CHECK USER] ❌ Không nhận được ID từ GoLike")
                     else:
-                        self.log(f"[CHECK USER] ❌ GoLike Error: {result}")
-                
+                        self.log(f"[CHECK USER] ❌ GoLike Error (attempt {attempt + 1}): {result}")
+                        if attempt < max_retries - 1:
+                            time.sleep(2)
+                            # Re-check existence
+                            exists, id_golike = self.check_account_golike(username)
+                    
+            # Nếu hết retry vẫn lỗi
+            return {
+                **default_error,
+                'message': 'Không thể thêm vào GoLike sau 3 lần thử',
+                'username': username,
+                'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
+                'proxy': proxy
+            }
+                    
         except Exception as e:
             self.log(f"[CHECK USER] ❌ EXCEPTION: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            
             return {
-                'success': False,
-                'status': 'error',
-                'message': str(e),
+                **default_error,
+                'message': f'Exception: {str(e)}',
                 'username': None,
-                'cookie': account_data.get('cookie', '')[:50] + '...' if len(account_data.get('cookie', '')) > 50 else account_data.get('cookie', ''),
+                'cookie': account_data.get('cookie', '')[:50] + '...' if account_data.get('cookie') and len(account_data.get('cookie', '')) > 50 else account_data.get('cookie', ''),
                 'proxy': account_data.get('proxy', '')
             }
-
-    def thread_check_account(self, max_workers=3):
-        """Check nhiều accounts song song"""
+    def thread_check_account(self, max_workers=1):
+        """
+        Check nhiều accounts TUẦN TỰ với error handling an toàn
+        """
         accounts = self.account.get('new_instagram_accounts', [])
         
         if not accounts:
@@ -378,40 +438,113 @@ class InstagramManager:
             return []
         
         self.log(f"\n{'='*60}")
-        self.log(f"[THREAD] Bắt đầu check {len(accounts)} accounts với {max_workers} workers")
+        self.log(f"[THREAD] Bắt đầu check {len(accounts)} accounts")
         self.log(f"{'='*60}\n")
         
         results = []
-
+        
         for idx, acc in enumerate(accounts, 1):
+            result = None  # Initialize
+            
             try:
-                result = self.check_user(acc)
+                self.log(f"\n{'─'*60}")
+                self.log(f"[{idx}/{len(accounts)}] Checking account...")
+                self.log(f"{'─'*60}")
+                
+                # Validate account data
+                if not acc or not isinstance(acc, dict):
+                    self.log(f"[THREAD] ❌ Invalid account data at index {idx}")
+                    result = {
+                        'success': False,
+                        'status': 'error',
+                        'message': 'Dữ liệu account không hợp lệ',
+                        'username': None,
+                        'cookie': '',
+                        'proxy': ''
+                    }
+                else:
+                    # Check account
+                    result = self.check_user(acc)
+                
+                # Validate result
+                if result is None or not isinstance(result, dict):
+                    self.log(f"[THREAD] ⚠️ check_user returned None/invalid, creating default error")
+                    result = {
+                        'success': False,
+                        'status': 'error',
+                        'message': 'check_user returned invalid result',
+                        'username': None,
+                        'cookie': acc.get('cookie', '')[:30] + '...' if acc.get('cookie') else '',
+                        'proxy': acc.get('proxy', '')
+                    }
+                
                 results.append(result)
                 
-                self.log(f"\n[THREAD] Progress: {idx}/{len(accounts)}")
-                self.log(f"[THREAD] Result: {result['status']} - {result.get('username', 'N/A')}")
+                # Log kết quả
+                status_icon = "✅" if result.get('success') else "❌"
+                self.log(f"{status_icon} Result: {result.get('status')} - {result.get('username', 'N/A')}")
+                self.log(f"   Message: {result.get('message')}")
                 
-                # Gửi progress về frontend
+                # GỬI PROGRESS VỀ FRONTEND
                 try:
                     import eel
-                    eel.update_instagram_check_progress(result)
-                except:
-                    pass
+                    progress_data = {
+                        'success': result.get('success', False),
+                        'status': result.get('status', 'error'),
+                        'username': result.get('username', 'N/A'),
+                        'message': result.get('message', 'Unknown'),
+                        'current': idx,
+                        'total': len(accounts),
+                        'cookie': result.get('cookie', '')[:30] + '...',
+                        'proxy': result.get('proxy', '')
+                    }
+                    eel.update_instagram_check_progress(progress_data)
+                    self.log(f"   📡 Progress sent to frontend: {idx}/{len(accounts)}")
+                except Exception as e:
+                    self.log(f"   ⚠️ Cannot send progress to frontend: {str(e)}")
+                
+                # Delay giữa các accounts
+                if idx < len(accounts):
+                    time.sleep(2)
                     
             except Exception as e:
-                self.log(f"[THREAD] ❌ Error: {str(e)}")
-                results.append({
+                self.log(f"[THREAD] ❌ Critical error processing account {idx}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                
+                # Create safe error result
+                error_result = {
                     'success': False,
                     'status': 'error',
-                    'message': str(e),
-                    'username': None
-                })
-            
-            time.sleep(0.5)
-
+                    'message': f'Critical error: {str(e)}',
+                    'username': None,
+                    'cookie': acc.get('cookie', '')[:30] + '...' if isinstance(acc, dict) and acc.get('cookie') else '',
+                    'proxy': acc.get('proxy', '') if isinstance(acc, dict) else ''
+                }
+                results.append(error_result)
+                
+                # Gửi error về frontend
+                try:
+                    import eel
+                    eel.update_instagram_check_progress(error_result)
+                except:
+                    pass
+        
+        # Final validation - remove any None values
+        results = [r for r in results if r is not None and isinstance(r, dict)]
         
         self.log(f"\n{'='*60}")
-        self.log(f"[THREAD] ✅ HOÀN THÀNH! Đã check xong {len(results)} accounts")
+        self.log(f"[THREAD] ✅ HOÀN THÀNH! Đã check {len(results)}/{len(accounts)} accounts")
+        
+        # Safe counting
+        try:
+            success_count = len([r for r in results if r and r.get('success')])
+            failed_count = len([r for r in results if r and not r.get('success')])
+            self.log(f"   Success: {success_count}")
+            self.log(f"   Failed: {failed_count}")
+        except Exception as e:
+            self.log(f"   ⚠️ Error counting results: {str(e)}")
+        
         self.log(f"{'='*60}\n")
         
         return results
