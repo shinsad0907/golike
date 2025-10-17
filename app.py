@@ -884,13 +884,13 @@ if __name__ == '__main__':
             version = json.load(versiondata)
         status_checkkey = Check_key().check_update(key_data['key'], version)
         if status_checkkey['data'] == True:
-            eel.start('index.html', size=(1200, 800), port=6060)
+            eel.start('index.html', size=(1200, 800), port=6061)
         else:
             os.remove('data/key.json')
-            eel.start('key.html', size=(400, 600), port=6060)
+            eel.start('key.html', size=(400, 600), port=6061)
 
     except Exception as e:
         print(e)
-        eel.start('key.html', size=(400, 600), port=6060)
+        eel.start('key.html', size=(400, 600), port=6061)
 
     # eel.start('key.html', size=(1200, 800), port=6060)
