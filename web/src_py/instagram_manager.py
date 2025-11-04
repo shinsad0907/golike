@@ -9,14 +9,14 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from time import sleep
 # ❌ KHÔNG redirect stdout/stderr - sẽ làm hỏng Eel!
 # Chỉ cần bảo vệ flush() method trong hàm log()
-try:
-    json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../data/manager-golike.json'))
-except:
-    try:
-        json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
-    except:
-        json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/manager-golike.json'))
-# json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
+# try:
+#     json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../../data/manager-golike.json'))
+# except:
+#     try:
+#         json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
+#     except:
+#         json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../data/manager-golike.json'))
+json_path = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '../../data/manager-golike.json'))
 
 class InstagramManager:
     def __init__(self, account):

@@ -148,17 +148,22 @@ class InstagramManager {
         const matchInfo = document.getElementById('match-info');
         const saveBtn = document.getElementById('save-instagram-btn');
         
-        if (cookieCount > 0 && proxyCount > 0) {
-            if (cookieCount === proxyCount) {
+        // CHỈ CẦN CÓ COOKIE LÀ ĐỦ - Proxy không bắt buộc
+        if (cookieCount > 0) {
+            // Nếu có cả cookie và proxy, kiểm tra số lượng khớp
+            if (proxyCount > 0 && cookieCount !== proxyCount) {
+                warning.style.display = 'inline';
+                warning.textContent = '⚠️ Số lượng cookie và proxy không khớp!';
+                matchInfo.classList.add('mismatch');
+                saveBtn.disabled = true;
+            } else {
+                // Có cookie (và proxy khớp hoặc không có proxy) - OK
                 warning.style.display = 'none';
                 matchInfo.classList.remove('mismatch');
                 saveBtn.disabled = false;
-            } else {
-                warning.style.display = 'inline';
-                matchInfo.classList.add('mismatch');
-                saveBtn.disabled = true;
             }
         } else {
+            // Không có cookie - disable
             warning.style.display = 'none';
             matchInfo.classList.remove('mismatch');
             saveBtn.disabled = true;
@@ -172,18 +177,24 @@ class InstagramManager {
         const cookies = cookieText.split('\n').filter(line => line.trim());
         const proxies = proxyText.split('\n').filter(line => line.trim());
         
-        if (cookies.length === 0 || cookies.length !== proxies.length) {
-            alert('Vui lòng nhập đủ cookie và proxy với số lượng bằng nhau!');
+        if (cookies.length === 0) {
+            alert('Vui lòng nhập ít nhất 1 cookie!');
             return;
         }
         
-        // Log preview gọn gàng
+        // Kiểm tra nếu có proxy thì phải khớp số lượng
+        if (proxies.length > 0 && cookies.length !== proxies.length) {
+            alert('Nếu nhập proxy, số lượng phải bằng với cookie!');
+            return;
+        }
+        
         console.log('═══════════════════════════════════');
         console.log('📋 PREVIEW INSTAGRAM ACCOUNTS');
         console.log('═══════════════════════════════════');
         console.log(`📌 GoLike: ${this.selectedGolikeAccount.username_account}`);
         console.log(`📌 Authorization: ${this.selectedGolikeAccount.authorization.substring(0, 30)}...`);
         console.log(`📌 Số lượng: ${cookies.length} accounts`);
+        console.log(`📌 Có proxy: ${proxies.length > 0 ? 'Có' : 'Không'}`);
         console.log('───────────────────────────────────');
         
         const previewSection = document.getElementById('preview-section');
@@ -194,14 +205,13 @@ class InstagramManager {
         previewCount.textContent = cookies.length;
         
         cookies.forEach((cookie, index) => {
-            const proxy = proxies[index];
+            const proxy = proxies[index] || 'Không dùng proxy'; // Default nếu không có proxy
             const row = document.createElement('tr');
             
-            // Log từng cặp cookie-proxy
             console.log(`${index + 1}. Cookie: ${cookie.substring(0, 40)}... | Proxy: ${proxy}`);
             
             const isValidCookie = cookie.includes('sessionid') || cookie.length > 50;
-            const isValidProxy = proxy.includes(':');
+            const isValidProxy = proxy === 'Không dùng proxy' || proxy.includes(':');
             
             row.innerHTML = `
                 <td>${index + 1}</td>
@@ -211,7 +221,9 @@ class InstagramManager {
                     </div>
                 </td>
                 <td>
-                    <div class="preview-proxy">${proxy}</div>
+                    <div class="preview-proxy" style="${proxy === 'Không dùng proxy' ? 'color: #999; font-style: italic;' : ''}">
+                        ${proxy}
+                    </div>
                 </td>
                 <td>
                     <span class="preview-status ${isValidCookie && isValidProxy ? 'valid' : 'invalid'}">
@@ -238,17 +250,24 @@ class InstagramManager {
         const cookies = cookieText.split('\n').filter(line => line.trim());
         const proxies = proxyText.split('\n').filter(line => line.trim());
         
-        if (cookies.length === 0 || cookies.length !== proxies.length) {
-            alert('Vui lòng nhập đủ cookie và proxy với số lượng bằng nhau!');
+        if (cookies.length === 0) {
+            alert('Vui lòng nhập ít nhất 1 cookie!');
+            return;
+        }
+        
+        // Kiểm tra nếu có proxy thì phải khớp số lượng
+        if (proxies.length > 0 && cookies.length !== proxies.length) {
+            alert('Nếu nhập proxy, số lượng phải bằng với cookie!');
             return;
         }
         
         console.log(`📌 Số lượng IG sẽ thêm: ${cookies.length}`);
+        console.log(`📌 Có proxy: ${proxies.length > 0 ? 'Có (' + proxies.length + ')' : 'Không'}`);
         
-        // Đơn giản hóa: chỉ gửi cookie + proxy
+        // Tạo accounts với proxy rỗng nếu không có
         const newInstagramAccounts = cookies.map((cookie, index) => ({
             cookie: cookie.trim(),
-            proxy: proxies[index].trim()
+            proxy: proxies[index] ? proxies[index].trim() : '' // Rỗng nếu không có proxy
         }));
         
         // Hiển thị modal progress
@@ -264,10 +283,10 @@ class InstagramManager {
             
             console.log('📤 Sending to Python:', {
                 golike_id: dataToSave.golike_account_id,
-                total: newInstagramAccounts.length
+                total: newInstagramAccounts.length,
+                with_proxy: newInstagramAccounts.filter(acc => acc.proxy).length
             });
             
-            // FIX: Gọi hàm Python với timeout
             const saveResult = await Promise.race([
                 eel.process_instagram_accounts(dataToSave)(),
                 new Promise((_, reject) => 
@@ -277,7 +296,6 @@ class InstagramManager {
             
             console.log('📥 Response:', saveResult);
             
-            // FIX: Validate response
             if (!saveResult || typeof saveResult !== 'object') {
                 throw new Error('Response không hợp lệ từ Python');
             }
@@ -307,7 +325,6 @@ class InstagramManager {
             this.hideProgressModal();
         }
     }
-
     
     showErrorModal(error) {
         const modal = document.createElement('div');
