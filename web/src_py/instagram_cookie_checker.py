@@ -93,12 +93,27 @@ class InstagramCookieChecker:
             # Setup proxy nếu có
             proxies = self.setup_proxy()
             
-            # Request tới Instagram
+            # ⚠️ LIMIT REDIRECTS - Tránh vòng lặp redirect vô tận từ proxy dead
+            # Sử dụng session adapter để giới hạn redirects
+            from requests.adapters import HTTPAdapter
+            from requests.packages.urllib3.util.retry import Retry
+            
+            retry_strategy = Retry(
+                total=5,  # Max 5 redirects
+                backoff_factor=0.3,
+                status_forcelist=[429, 500, 502, 503, 504],
+                allowed_methods=["HEAD", "GET", "OPTIONS"]
+            )
+            adapter = HTTPAdapter(max_retries=retry_strategy)
+            self.session.mount("http://", adapter)
+            self.session.mount("https://", adapter)
+            
+            # Request tới Instagram - TIMEOUT ngắn cho proxy check
             response = self.session.get(
                 'https://www.instagram.com/',
                 headers=self.headers,
                 proxies=proxies,
-                timeout=15,
+                timeout=10,  # Giảm từ 15 xuống 10 để fail nhanh hơn
                 allow_redirects=True
             )
             

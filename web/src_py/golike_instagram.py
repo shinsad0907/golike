@@ -321,14 +321,21 @@ class GolikeInstagram:
         homepage_data = self.get_homepage(session_data, account_ig)
         
         if not homepage_data:
+            # ✅ ĐÁNH DẤU ACCOUNT NÀY ĐÃ BỊ LỖI, KHÔNG CHẠY NỮA
+            with self.stats_lock:
+                self.exhausted_ig_accounts.add(account_ig['id_account_golike'])
+            
             try:
                 import eel
-                eel.update_runner_log(f"⚠️ Không thể load homepage cho @{account_ig['username']}")
+                eel.update_runner_log(f"⚠️ Không thể load homepage cho @{account_ig['username']} (ID: {account_ig['id_account_golike']}) - Đã bỏ qua!")
             except:
                 pass
+            
+            # ✅ CẬP NHẬT STATS SAU KHI BỎ QUA ACCOUNT
+            self.send_stats_update()
             return
         
-        # Chạy missions cho Instagram account này
+        # Chạy missions cho Instagram account này - FOR LOOP HẾT TẤT CẢ COOKIE RỒI MỚI DELAY
         for i in range(self.switch_account):
             if not self.is_running:
                 break
@@ -354,7 +361,6 @@ class GolikeInstagram:
                         eel.update_runner_log(f"⚠️ @{account_ig['username']} (ID: {account_ig['id_account_golike']}) đã hết nhiệm vụ!")
                     except:
                         pass
-                    # ✅ CẬP NHẬT STATS KHI ACCOUNT HẾT NHIỆM VỤ
                     self.send_stats_update()
                     break
                 
@@ -406,7 +412,6 @@ class GolikeInstagram:
                     if status_complete:
                         mission_earning = int(mission_golike['price_after_cost'])
                         
-                        # ✅ THREAD-SAFE UPDATE STATS
                         with self.stats_lock:
                             self.price_after_cost += mission_earning
                             account_earnings_dict['total'] += mission_earning
@@ -426,6 +431,7 @@ class GolikeInstagram:
                                 current_total = self.price_after_cost
                             
                             eel.update_runner_log(f"[{account_ig['id_account_golike']}] ✅ #{current_mission} - {task_name} 💰 +{mission_earning}đ | Tổng: {current_total}đ{proxy_display}")
+                            sleep(10)
                         except:
                             pass
                         
@@ -434,14 +440,7 @@ class GolikeInstagram:
                         if not self.is_running:
                             break
                         
-                        # Sleep từng đoạn nhỏ
-                        delay_remaining = self.delay
-                        while delay_remaining > 0 and self.is_running:
-                            sleep_time = min(0.5, delay_remaining)
-                            sleep(sleep_time)
-                            delay_remaining -= sleep_time
-                            if not self.is_running:
-                                break
+                        # ⚠️ KHÔNG DELAY NGAY - CHỈ DELAY SAU KHI HẾT TẤT CẢ COOKIE
                     else:
                         if not self.is_running:
                             break
@@ -470,6 +469,14 @@ class GolikeInstagram:
                 except:
                     pass
                 continue
+        
+        # ✅ DELAY SAU KHI HẾT TẤT CẢ COOKIE (KHÔNG DELAY SAU MỖI COOKIE)
+        if self.is_running and account_mission_count['count'] < self.stop_account:
+            delay_remaining = self.delay
+            while delay_remaining > 0 and self.is_running:
+                sleep_time = min(0.5, delay_remaining)
+                sleep(sleep_time)
+                delay_remaining -= sleep_time
 
     # ✅ HÀM SỬA LẠI: CHẠY MISSION CHO GOLIKE ACCOUNT VỚI MULTI-THREAD COOKIE
     def run_mission(self, data_account):
@@ -497,8 +504,7 @@ class GolikeInstagram:
                     pass
                 break
             
-            # ✅ CHẠY INSTAGRAM ACCOUNTS TRONG THREADS
-            ig_threads = []
+            # ✅ CHẠY INSTAGRAM ACCOUNTS TRONG THREADS VỚI DELAY GIỮA MỖI LUỒNG
             active_ig_accounts = [
                 ig for ig in data_account['instagram_accounts']
                 if ig['id_account_golike'] not in self.exhausted_ig_accounts
@@ -507,31 +513,33 @@ class GolikeInstagram:
             if not active_ig_accounts:
                 break
             
-            # Chia Instagram accounts thành batches theo threadCountCookie
-            for i in range(0, len(active_ig_accounts), self.threadCountCookie):
+            # Chạy thread cho từng Instagram account với delay giữa các luồng
+            ig_threads = []
+            for account_ig in active_ig_accounts:
                 if not self.is_running:
                     break
                 
-                batch = active_ig_accounts[i:i + self.threadCountCookie]
-                batch_threads = []
+                if account_ig['id_account_golike'] in self.exhausted_ig_accounts:
+                    continue
                 
-                for account_ig in batch:
-                    if not self.is_running:
-                        break
-                    
-                    t = threading.Thread(
-                        target=self.run_instagram_account,
-                        args=(account_ig, data_account, account_mission_count, account_earnings_dict)
-                    )
-                    t.start()
-                    batch_threads.append(t)
+                t = threading.Thread(
+                    target=self.run_instagram_account,
+                    args=(account_ig, data_account, account_mission_count, account_earnings_dict)
+                )
+                t.start()
+                ig_threads.append(t)
                 
-                # Đợi batch này hoàn thành trước khi chạy batch tiếp theo
-                for t in batch_threads:
-                    t.join()
-                
-                if not self.is_running:
-                    break
+                # ✅ DELAY GIỮA MỖI LUỒNG (TRÁNH SPAM)
+                if self.is_running and len(active_ig_accounts) > 1:
+                    delay_remaining = 2  # 2 giây delay giữa các luồng
+                    while delay_remaining > 0 and self.is_running:
+                        sleep_time = min(0.5, delay_remaining)
+                        sleep(sleep_time)
+                        delay_remaining -= sleep_time
+            
+            # Đợi tất cả threads hoàn thành
+            for t in ig_threads:
+                t.join()
         
         try:
             import eel

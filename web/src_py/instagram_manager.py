@@ -312,13 +312,42 @@ class InstagramManager:
             
             self.log("[CHECK USER] Đang request Instagram...")
             
-            response = session.get('https://www.instagram.com/',
-                                headers=self.headers,
-                                proxies=proxies,
-                                timeout=15,
-                                impersonate='chrome110')
+            # ⚠️ TRY WITH PROXY FIRST, THEN WITHOUT IF PROXY FAILS
+            max_retries = 2
+            last_error = None
             
-            self.log(f"[CHECK USER] HTTP Status: {response.status_code}")
+            for attempt in range(max_retries):
+                try:
+                    # Nếu là retry thứ 2 và có proxy → skip proxy, request trực tiếp
+                    current_proxies = proxies if attempt == 0 else None
+                    timeout_val = 8 if proxies else 15  # Timeout ngắn cho proxy
+                    
+                    if attempt > 0 and proxies:
+                        self.log(f"[CHECK USER] ⚠️ Retry mà không dùng proxy...")
+                    
+                    response = session.get('https://www.instagram.com/',
+                                        headers=self.headers,
+                                        proxies=current_proxies,
+                                        timeout=timeout_val,
+                                        impersonate='chrome110')
+                    
+                    self.log(f"[CHECK USER] HTTP Status: {response.status_code}")
+                    break  # Success, exit loop
+                    
+                except Exception as e:
+                    last_error = str(e)
+                    self.log(f"[CHECK USER] ⚠️ Attempt {attempt + 1} failed: {last_error}")
+                    
+                    if attempt == max_retries - 1:
+                        # Tất cả retry đều fail
+                        self.log(f"[CHECK USER] ❌ Max retries exceeded")
+                        return {
+                            **default_error,
+                            'message': f'Connection error: {last_error[:100]}',
+                            'cookie': cookie[:50] + '...' if len(cookie) > 50 else cookie,
+                            'proxy': proxy
+                        }
+                    time.sleep(1)
             
             if response.status_code != 200:
                 self.log(f"[CHECK USER] ❌ HTTP Error {response.status_code}")

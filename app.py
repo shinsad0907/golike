@@ -874,23 +874,23 @@ def main_check_key(key):
 # Chạy ứng dụng
 if __name__ == '__main__':
     # if Check_key().checK_update():
-    #     eel.start('index.html', size=(1200, 800), port=8080)
+        eel.start('index.html', size=(1200, 800), port=8082)
     # else:
     #     pass
-    try:
-        with open(r'data/key.json', "r", encoding="utf-8") as f:
-            key_data = json.load(f)   # load xong là đóng file
-        with open(r'data/version_client.json', 'r', encoding="utf-8-sig") as versiondata:
-            version = json.load(versiondata)
-        status_checkkey = Check_key().check_update(key_data['key'], version)
-        if status_checkkey['data'] == True:
-            eel.start('index.html', size=(1200, 800), port=6061)
-        else:
-            os.remove('data/key.json')
-            eel.start('key.html', size=(400, 600), port=6061)
+    # try:
+    #     with open(r'data/key.json', "r", encoding="utf-8") as f:
+    #         key_data = json.load(f)   # load xong là đóng file
+    #     with open(r'data/version_client.json', 'r', encoding="utf-8-sig") as versiondata:
+    #         version = json.load(versiondata)
+    #     status_checkkey = Check_key().check_update(key_data['key'], version)
+    #     if status_checkkey['data'] == True:
+    #         eel.start('index.html', size=(1200, 800), port=6060)
+    #     else:
+    #         os.remove('data/key.json')
+    #         eel.start('key.html', size=(400, 600), port=6060)
 
-    except Exception as e:
-        print(e)
-        eel.start('key.html', size=(400, 600), port=6061)
+    # except Exception as e:
+    #     print(e)
+    #     eel.start('key.html', size=(400, 600), port=6060)
 
     # eel.start('key.html', size=(1200, 800), port=6060)
